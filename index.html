@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>League hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1EC; --panel:#FFFFFF; --ink:#18263A; --muted:#5B6878; --rule:#D5DBD3;
+  --pos:#2E7250; --neg:#B23A48; --gold:#A67A06; --track:#E2E7E0; --chip:#E8EDE6; --sel:#18263A; --selink:#FFFFFF;
+  --display:"Barlow Condensed","Arial Narrow","Roboto Condensed",sans-serif;
+  --body:"Barlow","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101A26; --panel:#172333; --ink:#E8EDF2; --muted:#9AA8B8; --rule:#2A384A;
+    --pos:#5BBF8A; --neg:#E2707E; --gold:#E0B04A; --track:#233246; --chip:#223044; --sel:#E8EDF2; --selink:#101A26;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101A26; --panel:#172333; --ink:#E8EDF2; --muted:#9AA8B8; --rule:#2A384A;
+  --pos:#5BBF8A; --neg:#E2707E; --gold:#E0B04A; --track:#233246; --chip:#223044; --sel:#E8EDF2; --selink:#101A26;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;font-variant-numeric:tabular-nums}
+main{max-width:760px;margin:0 auto;padding:28px 16px 64px}
+header h1{font-family:var(--display);font-weight:800;font-size:clamp(2.2rem,8vw,3.4rem);line-height:.95;margin:0 0 10px;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted);max-width:60ch}
+nav{position:sticky;top:0;z-index:5;background:var(--bg);margin:20px -16px 0;padding:10px 16px;overflow-x:auto;white-space:nowrap;border-bottom:1px solid var(--rule)}
+nav button{font:600 1.05rem var(--display);letter-spacing:.01em;color:var(--muted);background:none;border:0;padding:6px 12px;border-radius:999px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--sel);color:var(--selink)}
+nav button:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+section[hidden]{display:none}
+h2{font-family:var(--display);font-weight:700;font-size:1.75rem;margin:30px 0 4px}
+h3{font-family:var(--display);font-weight:700;font-size:1.3rem;margin:26px 0 8px}
+.lede{color:var(--muted);margin:0 0 16px;max-width:62ch}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+details.row{border-top:1px solid var(--rule)}
+details.row:first-child{border-top:0}
+summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:2.2rem 1fr auto;gap:10px;align-items:center;padding:12px 14px}
+summary::-webkit-details-marker{display:none}
+.rk{font-family:var(--display);font-weight:800;font-size:1.9rem;line-height:1;text-align:center}
+.tn{font-weight:600;line-height:1.2}
+.ow{color:var(--muted);font-size:.85rem}
+.rt{font-family:var(--display);font-weight:700;font-size:1.5rem;text-align:right;min-width:4.2rem}
+.rt small{display:block;font-family:var(--body);font-weight:500;font-size:.72rem;color:var(--muted);margin-top:-2px}
+.bar{height:8px;position:relative;background:var(--track);border-radius:4px}
+summary .bar,summary .stats{grid-column:2 / 4}
+.bar i{position:absolute;top:0;bottom:0;border-radius:4px}
+.bar b{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:var(--muted);opacity:.6}
+.bar.fill b{display:none}
+.stats{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.84rem;color:var(--muted)}
+.stats strong{color:var(--ink);font-weight:600}
+.detail{padding:4px 14px 16px calc(2.2rem + 24px)}
+.detail h4{font-size:.9rem;font-weight:600;margin:10px 0 6px}
+.pos{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.pos div{background:var(--chip);border-radius:6px;padding:5px 2px;text-align:center;font-size:.78rem}
+.pos span{display:block;font-weight:600;font-size:.9rem}
+.core{margin:0;padding:0;list-style:none;columns:2;column-gap:16px;font-size:.84rem}
+.core li{break-inside:avoid;display:flex;justify-content:space-between;gap:6px;padding:2px 0;border-bottom:1px dotted var(--rule)}
+.core em{font-style:normal;color:var(--muted);width:2.6rem;flex:none}
+.core li span:first-of-type{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list{padding:4px 14px}
+.lrow{display:grid;grid-template-columns:minmax(0,1fr) 38% 3.6rem;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--rule);font-size:.9rem}
+.lrow:first-child{border-top:0}
+.lrow .t{min-width:0}
+.lrow .t b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .t span{color:var(--muted);font-size:.8rem}
+.lrow .v{text-align:right;font-family:var(--display);font-weight:700;font-size:1.2rem}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{padding:8px 10px;text-align:left;border-top:1px solid var(--rule)}
+thead th{border-top:0;font-weight:600;color:var(--muted);font-size:.8rem}
+td.num,th.num{text-align:right}
+.wp{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.wp i{display:block;width:54px;height:6px;border-radius:3px;background:var(--track);position:relative;overflow:hidden}
+.wp i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);background:var(--c)}
+select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;max-width:100%}
+.pickwrap{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+/* bracket */
+.bracket{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;min-width:560px;padding:14px}
+.round h4{font:600 .85rem var(--body);color:var(--muted);margin:0 0 8px}
+.round{display:flex;flex-direction:column;justify-content:space-around;gap:14px}
+.game{border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--bg)}
+.slot{display:grid;grid-template-columns:1.4rem 1fr auto;gap:6px;padding:7px 9px;font-size:.84rem;align-items:center}
+.slot+.slot{border-top:1px solid var(--rule)}
+.slot .sd{font-family:var(--display);font-weight:800;color:var(--muted)}
+.slot .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.slot .pc{color:var(--muted);font-size:.78rem}
+.slot.tbd .nm{font-weight:400;color:var(--muted)}
+.heat{border-collapse:separate;border-spacing:2px;font-size:.78rem;min-width:520px}
+.heat th,.heat td{border:0;padding:5px 4px;text-align:center}
+.heat td{border-radius:4px}
+.heat th:first-child,.heat td:first-child{text-align:left;white-space:nowrap;max-width:9rem;overflow:hidden;text-overflow:ellipsis}
+/* pickem */
+.game-pick{padding:12px 14px;border-top:1px solid var(--rule)}
+.game-pick:first-child{border-top:0}
+.game-pick .meta{font-size:.8rem;color:var(--muted);margin-bottom:8px}
+.sides{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.side{font:inherit;text-align:left;color:var(--ink);background:var(--chip);border:1.5px solid transparent;border-radius:8px;padding:9px 10px;cursor:pointer;min-width:0}
+.side b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem}
+.side span{font-family:var(--display);font-weight:700;font-size:1.15rem}
+.side[aria-pressed="true"]{background:var(--sel);color:var(--selink)}
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.btn{font:600 1rem var(--body);color:var(--selink);background:var(--sel);border:0;border-radius:8px;padding:10px 16px;cursor:pointer}
+.btn[disabled]{opacity:.45;cursor:default}
+.note{font-size:.85rem;color:var(--muted)}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--rule)}
+input{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;width:7.5rem}
+input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:12px 14px}
+.chip{font-size:.82rem;padding:4px 10px;border-radius:999px;background:var(--chip);color:var(--muted)}
+.chip.in{background:var(--sel);color:var(--selink)}
+.grid td.hit{color:var(--pos);font-weight:600}.grid td.miss{color:var(--neg)}.grid td{white-space:nowrap}
+textarea{width:100%;min-height:150px;margin-top:10px;font:.85rem/1.4 var(--body);color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:10px}
+.empty{padding:18px 14px;color:var(--muted);font-size:.9rem}
+.award{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.award div{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:10px 12px}
+.award small{display:block;color:var(--muted);font-size:.78rem}
+.award b{display:block;font-weight:600;line-height:1.2;margin:2px 0}
+.award span{font-family:var(--display);font-weight:700;font-size:1.25rem}
+.method{margin-top:44px;font-size:.9rem;color:var(--muted);max-width:64ch}
+.method p{margin:0 0 10px}
+.up{color:var(--pos)} .dn{color:var(--neg)}
+@media (max-width:480px){.detail{padding-left:14px}.core{columns:1}.lrow{grid-template-columns:minmax(0,1fr) 30% 3.2rem}.award{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1 id="title">League hub</h1>
+<p id="sub"></p>
+</header>
+<nav role="tablist" aria-label="Sections">
+  <button role="tab" data-tab="rank" aria-selected="true">Rankings</button>
+  <button role="tab" data-tab="bracket" aria-selected="false">Playoffs</button>
+  <button role="tab" data-tab="pick" aria-selected="false">Pick'em</button>
+  <button role="tab" data-tab="parlay" aria-selected="false">Parlay</button>
+  <button role="tab" data-tab="luck" aria-selected="false">Luck</button>
+  <button role="tab" data-tab="eff" aria-selected="false">Lineups</button>
+  <button role="tab" data-tab="sched" aria-selected="false">Schedule</button>
+</nav>
+
+<section id="rank" role="tabpanel">
+  <h2>Power ranking</h2>
+  <p class="lede">Rating is projected points per week above or below the league average of <strong id="avg"></strong>. Tap a team for positional edges and its projected lineup.</p>
+  <div class="panel" id="board"></div>
+</section>
+
+<section id="bracket" role="tabpanel" hidden>
+  <h2>Projected playoff bracket</h2>
+  <p class="lede">Seeds by average finish across 20,000 simulated seasons. Top 6 make it, seeds 1 and 2 get byes. Percentages are each team's chance to win that projected game.</p>
+  <div class="panel scroll"><div class="bracket" id="br"></div></div>
+  <h3>Title odds</h3>
+  <div class="panel list" id="champ"></div>
+  <h3>Seed chances</h3>
+  <p class="lede">How often each team finished in each seed. Seeds 7–10 miss the playoffs.</p>
+  <div class="panel scroll" style="padding:8px"><table class="heat" id="heat"></table></div>
+</section>
+
+<section id="pick" role="tabpanel" hidden>
+  <h2 id="pickTitle">Pick'em</h2>
+  <p class="lede" id="lockLine">Pick every game against the spread. Everyone's picks are revealed when the week locks.</p>
+  <div class="panel" id="pickSetup" hidden><div class="empty">Pick'em isn't connected yet. Add your Supabase project URL and key to config.js.</div></div>
+  <div id="pickUI">
+    <div class="pickwrap">
+      <label for="picker">Team</label><select id="picker"><option value="">Choose your team</option></select>
+      <label for="pin">PIN</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" pattern="[0-9]*" maxlength="8" placeholder="4–8 digits">
+    </div>
+    <p class="note" style="margin:-4px 0 12px">Your first save sets your team's PIN. Use the same PIN to change picks until lock.</p>
+    <div class="panel" id="games"></div>
+    <div class="actions">
+      <button class="btn" id="save" disabled>Save picks</button>
+      <button class="btn ghost" id="load">Load my picks</button>
+      <span class="note" id="saveNote" aria-live="polite"></span>
+    </div>
+    <h3 id="inTitle">Who's in</h3>
+    <div class="panel" id="inList"></div>
+  </div>
+  <h3>Leaderboard</h3>
+  <div class="panel" id="board2"><div class="empty">Loading…</div></div>
+</section>
+
+<section id="parlay" role="tabpanel" hidden>
+  <h2 id="parlayTitle">Loser's parlay</h2>
+  <p class="lede" id="parlayLede">Everyone adds one leg. Last week's low scorer places the bet.</p>
+  <div class="panel" id="parlaySetup" hidden><div class="empty">The parlay board isn't connected yet. Add your Supabase project URL and key to config.js and run setup-parlay.sql.</div></div>
+  <div id="parlayUI">
+    <div class="award" id="onHook"></div>
+    <div class="panel list" id="legs"></div>
+    <h3>Your leg</h3>
+    <div class="pickwrap">
+      <label for="legTeam">Team</label><select id="legTeam"><option value="">Choose your team</option></select>
+      <label for="legPin">PIN</label><input id="legPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="4–8 digits">
+    </div>
+    <input id="legText" maxlength="140" placeholder="e.g. Bijan Robinson over 85.5 rush yards" style="width:100%">
+    <div class="actions">
+      <button class="btn" id="legSave">Save my leg</button>
+      <button class="btn ghost" id="legCopy">Copy all legs</button>
+      <span class="note" id="legNote" aria-live="polite"></span>
+    </div>
+    <textarea id="legOut" readonly hidden aria-label="All legs"></textarea>
+    <details class="panel" style="margin-top:20px;padding:12px 14px">
+      <summary style="display:block;padding:0;font-weight:600;cursor:pointer">Record how it went</summary>
+      <p class="note" style="margin:8px 0 10px">Whoever placed the bet fills this in, using their own team and PIN above.</p>
+      <div class="pickwrap">
+        <label for="stStatus">Result</label><select id="stStatus"><option value="pending">Pending</option><option value="hit">Hit</option><option value="miss">Miss</option></select>
+        <label for="stOdds">Odds</label><input id="stOdds" maxlength="20" placeholder="+1400" style="width:6rem">
+      </div>
+      <input id="stNote" maxlength="140" placeholder="Optional note, e.g. died on the last leg" style="width:100%">
+      <div class="actions"><button class="btn" id="stSave">Save result</button><span class="note" id="stNoteMsg" aria-live="polite"></span></div>
+    </details>
+    <h3>Parlay history</h3>
+    <div class="panel" id="parlayHist"></div>
+  </div>
+</section>
+
+<section id="luck" role="tabpanel" hidden>
+  <h2>Luck index</h2>
+  <p class="lede">All-play record is how a team would do against every other team each week. Luck is actual wins minus the wins that all-play rate would earn. Positive means the schedule has been kind.</p>
+  <div class="panel list" id="luckList"></div>
+</section>
+
+<section id="eff" role="tabpanel" hidden>
+  <h2>Manager efficiency</h2>
+  <p class="lede">Points actually started as a share of the best possible lineup from the same roster. Taxi and IR players aren't counted.</p>
+  <div class="award" id="awards"></div>
+  <div class="panel list" id="effList"></div>
+</section>
+
+<section id="sched" role="tabpanel" hidden>
+  <h2>Rest-of-season strength of schedule</h2>
+  <p class="lede">Average projected score of each opponent in the week you face them, byes included. The whole spread is under 5 points a week, so schedule is a small factor in this league.</p>
+  <div class="panel list" id="sos"></div>
+  <h3>Weekly outlook</h3>
+  <div class="pickwrap"><label for="pickT">Team</label><select id="pickT"></select></div>
+  <div class="panel scroll"><table style="min-width:420px"><thead><tr><th>Wk</th><th>Opponent</th><th class="num">Proj</th><th class="num">Opp</th><th class="num">Win chance</th></tr></thead><tbody id="rows"></tbody></table></div>
+</section>
+
+<section class="method">
+<h2>How it's built</h2>
+<p>Player projections come from Sleeper's weekly feed, rescored with this league's rules (6-point passing TDs, full PPR, custom kicker and defense scoring). Each week the model starts the highest-projected legal lineup from active roster players; taxi and IR spots are excluded and players on bye score zero.</p>
+<p>Power score blends the rest-of-season rating with actual points versus average; actual results count 10% after week 1 and grow to 50% by week 9. Win chances assume each team's weekly score varies by about 30 points around its projection. Playoff seeding uses wins, then points for, and the bracket runs 4 vs 5 and 3 vs 6 in week 15, with the winners facing seeds 1 and 2 in week 16 and the final in week 17.</p>
+<p>The loser's parlay board is on the honor system: everyone adds a leg before Sunday 1:00 PM Eastern, the previous week's low scorer places it, and whoever placed it records the result.</p>
+<p>Data refreshes every morning from Sleeper. Spreads are the projected margin rounded to the nearest half point and are frozen once posted. Later-week projections are rougher and don't know about future injuries or trades.</p>
+</section>
+</main>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sg=(v,d=1)=>(v>0?"+":v<0?"−":"")+Math.abs(v).toFixed(d);
+const erf=x=>{const s=Math.sign(x);x=Math.abs(x);const a=1/(1+0.3275911*x);return s*(1-(((((1.061405429*a-1.453152027)*a)+1.421413741)*a-0.284496736)*a+0.254829592)*a*Math.exp(-x*x));};
+const wpc=(a,b)=>0.5*(1+erf((a-b)/60));
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const divBar=(v,max,goodPos=true)=>{const pct=max?Math.abs(v)/max*50:0,left=v>=0?50:50-pct;const c=(v>=0)===goodPos?'var(--pos)':'var(--neg)';return {html:`<span class="bar" aria-hidden="true"><b></b><i style="left:${left}%;width:${pct}%;background:${c}"></i></span>`,c}};
+const $=id=>document.getElementById(id);
+
+// tabs
+const tabs=[...document.querySelectorAll('nav button')];
+function show(id){tabs.forEach(b=>{const on=b.dataset.tab===id;b.setAttribute('aria-selected',on);$(b.dataset.tab).hidden=!on});store.set('hubtab',id)}
+tabs.forEach(b=>b.addEventListener('click',()=>show(b.dataset.tab)));
+const saved=store.get('hubtab'); if(saved&&$(saved)) show(saved);
+
+fetch('data.json?v='+Date.now()).then(r=>{if(!r.ok) throw new Error(r.status);return r.json()}).then(init).catch(e=>{
+  $('sub').textContent='League data hasn\'t been built yet. Run the "Update league data" workflow in GitHub Actions, then reload.';
+});
+
+function init(DATA){
+const T=DATA.teams, byId={}; T.forEach(t=>byId[t.rid]=t);
+const updated=new Date(DATA.updated);
+$('title').innerHTML=esc(DATA.league||'League')+'<br>League hub';
+document.title=(DATA.league||'League')+' hub';
+$('sub').textContent=`Week ${DATA.week}, updated ${updated.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}. Power ratings, playoff odds, luck, lineup grades and a live pick'em.`;
+$('avg').textContent=DATA.avg.toFixed(1);
+
+// rankings
+const maxP=Math.max(...T.map(t=>Math.abs(t.power)))||1;
+$('board').innerHTML=T.map(t=>{
+  const b=divBar(t.power,maxP);
+  const pos=Object.entries(t.pos).map(([k,v])=>`<div>${k}<span class="${v>0.2?'up':v<-0.2?'dn':''}">${sg(v)}</span></div>`).join('');
+  const core=t.core.map(c=>`<li><em>${c[1]}</em><span>${esc(c[0])}</span><span>${c[2].toFixed(1)}</span></li>`).join('');
+  return `<details class="row"><summary>
+    <span class="rk">${t.rank}</span>
+    <span><span class="tn">${esc(t.name)}</span><br><span class="ow">${esc(t.owner)}, ${t.w}–${t.l}${t.t?'–'+t.t:''}</span></span>
+    <span class="rt" style="color:${b.c}">${sg(t.power)}<small>power</small></span>
+    ${b.html}
+    <span class="stats"><span>ROS <strong>${t.ros.toFixed(1)}</strong>/wk</span><span>Exp. wins <strong>${t.xw.toFixed(1)}</strong></span><span>Playoffs <strong>${t.po}%</strong></span><span>Title <strong style="color:var(--gold)">${t.champ<1?'<1':t.champ.toFixed(0)}%</strong></span></span>
+  </summary><div class="detail">
+    <h4>Positional edge vs. league average (pts/wk)</h4><div class="pos">${pos}</div>
+    ${core?`<h4>Projected week ${DATA.lineup_week} lineup</h4><ul class="core">${core}</ul>`:''}
+  </div></details>`}).join('');
+
+// bracket
+(function(){
+  const s=DATA.seeds, pw=DATA.pw;
+  if(!s||s.length<6){$('br').innerHTML='<div class="empty">Bracket view supports 6-team playoffs.</div>';return}
+  const slot=(rid,seed,p)=>`<div class="slot"><span class="sd">${seed}</span><span class="nm">${esc(byId[rid].name)}</span><span class="pc">${p}%</span></div>`;
+  const game=(a,sa,b,sb,w)=>{const p=Math.round(wpc(pw[a][w],pw[b][w])*100);return {html:`<div class="game">${slot(a,sa,p)}${slot(b,sb,100-p)}</div>`,win:p>=50?[a,sa]:[b,sb]}};
+  const g45=game(s[3],4,s[4],5,15), g36=game(s[2],3,s[5],6,15);
+  const sf1=game(s[0],1,g45.win[0],g45.win[1],16), sf2=game(s[1],2,g36.win[0],g36.win[1],16);
+  const fin=game(sf1.win[0],sf1.win[1],sf2.win[0],sf2.win[1],17);
+  $('br').innerHTML=`<div class="round"><h4>Round 1, week 15</h4>${g45.html}${g36.html}</div>
+    <div class="round"><h4>Semifinals, week 16</h4>${sf1.html}${sf2.html}</div>
+    <div class="round"><h4>Final, week 17</h4>${fin.html}</div>`;
+  const ch=[...T].sort((a,b)=>b.champ-a.champ), mx=ch[0].champ||1;
+  $('champ').innerHTML=ch.map(t=>`<div class="lrow"><span class="t"><b>${esc(t.name)}</b><span>Final ${t.final}%, playoffs ${t.po}%</span></span><span class="bar fill"><i style="left:0;width:${t.champ/mx*100}%;background:var(--gold)"></i></span><span class="v">${t.champ<1?'<1':t.champ.toFixed(0)}%</span></div>`).join('');
+  const bySeed=[...T].sort((a,b)=>a.exp_seed-b.exp_seed), n=T.length;
+  let h='<thead><tr><th>Team</th>'+[...Array(n)].map((_,i)=>`<th>${i+1}</th>`).join('')+'</tr></thead><tbody>';
+  bySeed.forEach(t=>{h+=`<tr><td title="${esc(t.name)}">${esc(t.name)}</td>`+t.seeds.map((v,i)=>{const a=Math.min(v/60,1)*80;const base=i<DATA.playoff_teams?'var(--pos)':'var(--neg)';return `<td style="background:color-mix(in srgb, ${base} ${a.toFixed(0)}%, transparent);${a>45?'color:var(--selink)':''}">${v>=1?Math.round(v):v>0?'·':''}</td>`}).join('')+'</tr>'});
+  $('heat').innerHTML=h+'</tbody>';
+})();
+
+// luck
+(function(){
+  if(!DATA.done.length){$('luckList').innerHTML='<div class="empty">Luck shows up after week 1 is scored.</div>';return}
+  const L=[...T].sort((a,b)=>b.luck-a.luck), mx=Math.max(...T.map(t=>Math.abs(t.luck)))||1;
+  $('luckList').innerHTML=L.map(t=>{const b=divBar(t.luck,mx);return `<div class="lrow"><span class="t"><b>${esc(t.name)}</b><span>${t.w}–${t.l} actual, ${t.apw}–${t.apl} all-play, PF ${t.pf.toFixed(1)}, PA ${t.pa.toFixed(1)}</span></span>${b.html}<span class="v" style="color:${b.c}">${sg(t.luck,2)}</span></div>`}).join('');
+})();
+
+// efficiency
+(function(){
+  if(!DATA.done.length){$('effList').innerHTML='<div class="empty">Lineup grades show up after week 1 is scored.</div>';return}
+  const E=[...T].sort((a,b)=>b.eff-a.eff), worst=[...T].sort((a,b)=>b.left-a.left)[0], bb=[...T].filter(t=>t.bench).sort((a,b)=>b.bench[1]-a.bench[1])[0];
+  $('awards').innerHTML=`<div><small>Best lineup management</small><b>${esc(E[0].name)}</b><span>${E[0].eff.toFixed(1)}%</span></div>
+   <div><small>Most left on the bench</small><b>${esc(worst.name)}</b><span>${worst.left.toFixed(1)} pts</span></div>`+
+   (bb?`<div><small>Biggest bench game</small><b>${esc(bb.bench[0])}, ${esc(bb.name)}</b><span>${bb.bench[1].toFixed(1)} pts, wk ${bb.bench[2]}</span></div>`:'');
+  $('effList').innerHTML=E.map(t=>{const c=t.eff>=90?'var(--pos)':t.eff>=80?'var(--gold)':'var(--neg)';
+    return `<div class="lrow"><span class="t"><b>${esc(t.name)}</b><span>${t.act.toFixed(1)} of ${t.opt.toFixed(1)} possible, ${t.left.toFixed(1)} left on bench</span></span><span class="bar fill"><i style="left:0;width:${Math.max(0,(t.eff-50)*2)}%;background:${c}"></i></span><span class="v" style="color:${c}">${t.eff.toFixed(0)}%</span></div>`}).join('');
+})();
+
+// schedule
+(function(){
+  const S=[...T].sort((a,b)=>a.sosr-b.sosr), mx=Math.max(...T.map(t=>Math.abs(t.sosd)))||1;
+  $('sos').innerHTML=S.map(t=>{const b=divBar(t.sosd,mx,false);return `<div class="lrow"><span class="t"><b>${t.sosr}. ${esc(t.name)}</b><span>Opponents average ${t.sos.toFixed(1)}</span></span>${b.html}<span class="v" style="color:${b.c}">${sg(t.sosd)}</span></div>`}).join('');
+  const pick=$('pickT'), rows=$('rows');
+  T.forEach(t=>pick.insertAdjacentHTML('beforeend',`<option value="${t.rid}">${esc(t.name)}</option>`));
+  function render(rid){let h='';Object.keys(DATA.weekly[rid]||{}).map(Number).sort((a,b)=>a-b).forEach(w=>{const o=DATA.sched[w][rid],me=DATA.weekly[rid][w],op=DATA.weekly[o][w];const pc=Math.round(wpc(me,op)*100),c=pc>=50?'var(--pos)':'var(--neg)';
+    h+=`<tr><td>${w}</td><td>${esc(byId[o].name)}</td><td class="num">${me.toFixed(1)}</td><td class="num">${op.toFixed(1)}</td><td class="num"><span class="wp"><i style="--w:${pc}%;--c:${c}"></i>${pc}%</span></td></tr>`});rows.innerHTML=h||'<tr><td colspan="5">Regular season is over.</td></tr>'}
+  pick.addEventListener('change',e=>render(e.target.value)); render(T[0].rid);
+})();
+
+// pick'em and parlay
+pickem(DATA,T,byId);
+parlay(DATA,T,byId);
+}
+
+let _sb;
+function client(){
+  const cfg=window.HUB_CONFIG||{};
+  if(!(cfg.SUPABASE_URL&&/^https:\/\//.test(cfg.SUPABASE_URL)&&window.supabase)) return null;
+  if(!_sb) _sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_KEY,{auth:{persistSession:false}});
+  return _sb;
+}
+
+async function pickem(DATA,T,byId){
+  const ready=!!client();
+  const wk=DATA.week, lines=(DATA.lines||{})[wk]||[];
+  const lab=sp=>sp?sp.toFixed(1):'PK';
+  $('pickTitle').textContent=`Week ${wk} pick'em against the spread`;
+  if(!ready){$('pickSetup').hidden=false;$('pickUI').hidden=true;$('board2').innerHTML='<div class="empty">Leaderboard appears once pick\'em is connected.</div>';return}
+  const sb=client();
+  const picker=$('picker'), pin=$('pin'), note=$('saveNote');
+  T.forEach(t=>picker.insertAdjacentHTML('beforeend',`<option value="${t.rid}">${esc(t.name)}</option>`));
+  const prefs=store.get('hubpick')||{}; if(prefs.team) picker.value=prefs.team;
+  let mine={}, locked=false, lockAt=null;
+
+  const {data:lockData}=await sb.rpc('pick_lock',{p_week:wk});
+  if(lockData){lockAt=new Date(lockData); locked=Date.now()>=lockAt}
+  function lockText(){
+    if(!lockAt) return 'Pick every game against the spread.';
+    const when=lockAt.toLocaleString([], {weekday:'long',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    if(locked) return `Picks locked ${when}. Everyone's picks are below.`;
+    const ms=lockAt-Date.now(), h=Math.floor(ms/36e5), m=Math.floor(ms%36e5/6e4);
+    return `Picks lock ${when} (${h>=24?Math.floor(h/24)+'d '+(h%24)+'h':h+'h '+m+'m'} left). Everyone's picks are revealed at lock.`;
+  }
+  $('lockLine').textContent=lockText();
+
+  function renderGames(){
+    $('games').innerHTML=lines.map(g=>{
+      const f=byId[g.fav], d=byId[g.dog];
+      return `<div class="game-pick"><div class="meta">Total ${g.total.toFixed(1)}, favorite wins ${g.favwp}% of the time</div><div class="sides">
+        <button class="side" data-m="${g.mid}" data-r="${g.fav}" aria-pressed="${mine[g.mid]==g.fav}" ${locked?'disabled':''}><b>${esc(f.name)}</b><span>${g.spread?'−'+lab(g.spread):'PK'}</span></button>
+        <button class="side" data-m="${g.mid}" data-r="${g.dog}" aria-pressed="${mine[g.mid]==g.dog}" ${locked?'disabled':''}><b>${esc(d.name)}</b><span>${g.spread?'+'+lab(g.spread):'PK'}</span></button>
+      </div></div>`}).join('')||'<div class="empty">Lines for this week post Wednesday.</div>';
+    const n=lines.filter(g=>mine[g.mid]!=null).length;
+    $('save').disabled=locked||!lines.length||n<lines.length;
+    $('load').hidden=locked;
+    if(!locked&&lines.length&&!note.dataset.hold) note.textContent=n<lines.length?`${n} of ${lines.length} picked`:'';
+  }
+  $('games').addEventListener('click',e=>{const b=e.target.closest('.side');if(!b||locked)return;mine[b.dataset.m]=Number(b.dataset.r);delete note.dataset.hold;renderGames()});
+  picker.addEventListener('change',()=>{prefs.team=picker.value;store.set('hubpick',prefs);mine={};renderGames()});
+  const check=()=>{if(!picker.value){note.textContent='Choose your team first.';return false}if(!/^\d{4,8}$/.test(pin.value)){note.textContent='Enter a 4–8 digit PIN.';return false}return true};
+  const hold=t=>{note.dataset.hold=1;note.textContent=t};
+  $('save').addEventListener('click',async()=>{
+    if(!check())return; $('save').disabled=true; hold('Saving…');
+    const {error}=await sb.rpc('submit_picks',{p_team:Number(picker.value),p_pin:pin.value,p_week:wk,p_picks:mine});
+    hold(error?error.message:'Picks saved. You can change them until lock.');
+    renderGames(); loadIn();
+  });
+  $('load').addEventListener('click',async()=>{
+    if(!check())return; hold('Loading…');
+    const {data,error}=await sb.rpc('get_my_picks',{p_team:Number(picker.value),p_pin:pin.value,p_week:wk});
+    if(error){hold(error.message);return}
+    if(!data){hold('No saved picks for this team yet.');return}
+    mine=data; hold('Loaded your saved picks.'); renderGames();
+  });
+
+  async function loadIn(){
+    if(!locked){
+      $('inTitle').textContent="Who's in";
+      const {data}=await sb.rpc('submitted_teams',{p_week:wk});
+      const set=new Set((data||[]).map(Number));
+      $('inList').innerHTML=`<div class="chips">${T.map(t=>`<span class="chip ${set.has(t.rid)?'in':''}">${set.has(t.rid)?'✓ ':''}${esc(t.name)}</span>`).join('')}</div>`;
+    }
+  }
+  renderGames(); loadIn();
+
+  // all visible (locked) picks → reveal grid + leaderboard
+  const {data:all,error}=await sb.from('picks').select('team_id,week,picks');
+  if(error){$('board2').innerHTML=`<div class="empty">Couldn't load picks: ${esc(error.message)}</div>`;return}
+  const res=DATA.results||{};
+  const grade=(w,g,pick)=>{const r=res[w];if(!r||pick==null)return null;const m=r[g.fav]-r[g.dog]-g.spread;return m===0?'push':((m>0)===(pick==g.fav)?'win':'loss')};
+  if(locked){
+    $('inTitle').textContent=`Week ${wk} picks`;
+    const wkPicks=(all||[]).filter(p=>p.week==wk);
+    if(!wkPicks.length){$('inList').innerHTML='<div class="empty">Nobody picked this week.</div>'}
+    else{
+      let h='<div class="scroll"><table class="grid"><thead><tr><th>Team</th>'+lines.map(g=>`<th>${esc(byId[g.fav].name.slice(0,10))} −${lab(g.spread)}</th>`).join('')+'</tr></thead><tbody>';
+      wkPicks.forEach(p=>{h+=`<tr><td>${esc(byId[p.team_id]?.name||p.team_id)}</td>`+lines.map(g=>{const pk=p.picks[g.mid];const gr=grade(wk,g,pk);return `<td class="${gr==='win'?'hit':gr==='loss'?'miss':''}">${pk==null?'–':pk==g.fav?'Fav':'Dog'}</td>`}).join('')+'</tr>'});
+      $('inList').innerHTML=h+'</tbody></table></div>';
+    }
+  }
+  const rec={};
+  (all||[]).forEach(p=>{
+    const ls=(DATA.lines||{})[p.week]; if(!ls||!res[p.week]) return;
+    const r=rec[p.team_id]=rec[p.team_id]||{w:0,l:0,p:0,weeks:{}};
+    let ww=0;
+    ls.forEach(g=>{const gr=grade(p.week,g,p.picks[g.mid]); if(gr==='win'){r.w++;ww++} else if(gr==='loss') r.l++; else if(gr==='push') r.p++;});
+    r.weeks[p.week]=ww;
+  });
+  const rows=Object.entries(rec).sort((a,b)=>(b[1].w-b[1].l)-(a[1].w-a[1].l)||b[1].w-a[1].w);
+  $('board2').innerHTML=rows.length?rows.map(([rid,r],i)=>{const g=r.w+r.l;return `<div class="lrow" style="padding:10px 14px;grid-template-columns:1.6rem minmax(0,1fr) 5rem"><span class="rk" style="font-size:1.2rem">${i+1}</span><span class="t"><b>${esc(byId[rid]?.name||rid)}</b><span>${g?Math.round(r.w/g*100):0}% against the spread, best week ${Math.max(...Object.values(r.weeks))} right</span></span><span class="v">${r.w}–${r.l}${r.p?'–'+r.p:''}</span></div>`}).join(''):`<div class="empty">No graded weeks yet. The leaderboard fills in after week ${wk} is scored.</div>`;
+}
+
+async function parlay(DATA,T,byId){
+  const sb=client(), wk=DATA.week;
+  if(!sb){$('parlaySetup').hidden=false;$('parlayUI').hidden=true;return}
+  const prefs=store.get('hubpick')||{};
+  const team=$('legTeam'), pin=$('legPin'), text=$('legText'), note=$('legNote');
+  T.forEach(t=>team.insertAdjacentHTML('beforeend',`<option value="${t.rid}">${esc(t.name)}</option>`));
+  if(prefs.team) team.value=prefs.team;
+  team.addEventListener('change',()=>{prefs.team=team.value;store.set('hubpick',prefs);fill()});
+
+  // who is on the hook: low scorer of the last completed week
+  const last=(DATA.done||[]).slice(-1)[0];
+  let loser=null;
+  if(last!=null){
+    const r=DATA.results[last]||{};
+    const low=Object.entries(r).sort((a,b)=>a[1]-b[1])[0];
+    if(low) loser={team:byId[low[0]], pts:low[1], week:last};
+  }
+  $('onHook').innerHTML=loser
+    ? `<div><small>Placing this week's parlay</small><b>${esc(loser.team.name)}</b><span>Low scorer in week ${loser.week}, ${loser.pts.toFixed(1)} pts</span></div>
+       <div><small>Legs due</small><b id="dueLine">Sunday 1:00 PM ET</b><span id="legCount">—</span></div>`
+    : `<div><small>Placing this week's parlay</small><b>To be decided</b><span>Set once a week is scored</span></div>`;
+
+  const {data:lockData}=await sb.rpc('parlay_lock',{p_week:wk});
+  const lockAt=lockData?new Date(lockData):null, locked=lockAt?Date.now()>=lockAt:false;
+  $('parlayTitle').textContent=`Week ${wk} loser's parlay`;
+  if(lockAt&&$('dueLine')) $('dueLine').textContent=lockAt.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  $('parlayLede').textContent=locked
+    ? `Legs are locked for week ${wk}. ${loser?loser.team.name+' places it.':''}`
+    : `Everyone adds one leg before the deadline. The previous week's low scorer places the bet.`;
+  [text,$('legSave')].forEach(el=>el.disabled=locked);
+
+  let legs=[];
+  async function fill(){
+    const {data,error}=await sb.from('parlay_legs').select('team_id,week,leg').eq('week',wk);
+    if(error){$('legs').innerHTML=`<div class="empty">Couldn't load legs: ${esc(error.message)}</div>`;return}
+    legs=data||[];
+    const have=new Map(legs.map(l=>[String(l.team_id),l.leg]));
+    if($('legCount')) $('legCount').textContent=`${have.size} of ${T.length} legs in`;
+    $('legs').innerHTML=T.map(t=>{
+      const leg=have.get(String(t.rid));
+      return `<div class="lrow" style="grid-template-columns:8.5rem minmax(0,1fr)"><span class="t"><b>${esc(t.name)}</b></span><span style="${leg?'':'color:var(--muted)'}">${leg?esc(leg):'no leg yet'}</span></div>`;
+    }).join('');
+    if(team.value&&have.has(team.value)&&!text.value) text.value=have.get(team.value);
+  }
+  await fill();
+
+  const check=()=>{if(!team.value){note.textContent='Choose your team first.';return false}if(!/^\d{4,8}$/.test(pin.value)){note.textContent='Enter your 4–8 digit PIN.';return false}return true};
+  $('legSave').addEventListener('click',async()=>{
+    if(!check())return; note.textContent='Saving…';
+    const {data,error}=await sb.rpc('submit_leg',{p_team:Number(team.value),p_pin:pin.value,p_week:wk,p_leg:text.value});
+    note.textContent=error?error.message:(data==='removed'?'Leg removed.':'Leg saved. Change it any time before the deadline.');
+    fill();
+  });
+  $('legCopy').addEventListener('click',async()=>{
+    if(!legs.length){note.textContent='No legs in yet.';return}
+    const txt=`Week ${wk} loser's parlay${loser?', placed by '+loser.team.name:''}:\n`+legs.map(l=>`• ${byId[l.team_id]?.name||l.team_id}: ${l.leg}`).join('\n');
+    const ta=$('legOut');
+    try{await navigator.clipboard.writeText(txt);note.textContent='Copied all legs.';ta.hidden=true}
+    catch(e){ta.value=txt;ta.hidden=false;ta.focus();ta.select();note.textContent='Copy the text below.'}
+  });
+  $('stSave').addEventListener('click',async()=>{
+    if(!check())return; $('stNoteMsg').textContent='Saving…';
+    const {error}=await sb.rpc('settle_parlay',{p_team:Number(team.value),p_pin:pin.value,p_week:wk,p_status:$('stStatus').value,p_odds:$('stOdds').value,p_note:$('stNote').value});
+    $('stNoteMsg').textContent=error?error.message:'Result saved.';
+    hist();
+  });
+  async function hist(){
+    const {data}=await sb.from('parlay_results').select('week,status,odds,note,settled_by');
+    const rows=(data||[]).sort((a,b)=>b.week-a.week);
+    $('parlayHist').innerHTML=rows.length?rows.map(r=>{
+      const c=r.status==='hit'?'var(--pos)':r.status==='miss'?'var(--neg)':'var(--muted)';
+      const who=byId[r.settled_by]?.name;
+      return `<div class="lrow" style="grid-template-columns:3.5rem minmax(0,1fr) 4.5rem"><span class="rk" style="font-size:1.1rem">W${r.week}</span><span class="t"><b>${r.odds?esc(r.odds):'Parlay'}</b><span>${[who?'placed by '+esc(who):'',r.note?esc(r.note):''].filter(Boolean).join(', ')||'&nbsp;'}</span></span><span class="v" style="color:${c};text-transform:capitalize">${esc(r.status)}</span></div>`;
+    }).join(''):'<div class="empty">No parlays recorded yet.</div>';
+  }
+  hist();
+}
+</script>
+</body>
+</html>
