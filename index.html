@@ -168,9 +168,9 @@ textarea{width:100%;min-height:150px;margin-top:10px;font:.85rem/1.4 var(--body)
   <div id="pickUI">
     <div class="pickwrap">
       <label for="picker">Team</label><select id="picker"><option value="">Choose your team</option></select>
-      <label for="pin">PIN</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" pattern="[0-9]*" maxlength="8" placeholder="4–8 digits">
+      
     </div>
-    <p class="note" style="margin:-4px 0 12px">Your first save sets your team's PIN. Use the same PIN to change picks until lock.</p>
+    <p class="note" style="margin:-4px 0 12px">Pick your team, tap a side in every game, then save. You can change picks until lock.</p>
     <div class="panel" id="games"></div>
     <div class="actions">
       <button class="btn" id="save" disabled>Save picks</button>
@@ -194,7 +194,7 @@ textarea{width:100%;min-height:150px;margin-top:10px;font:.85rem/1.4 var(--body)
     <h3>Your leg</h3>
     <div class="pickwrap">
       <label for="legTeam">Team</label><select id="legTeam"><option value="">Choose your team</option></select>
-      <label for="legPin">PIN</label><input id="legPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="4–8 digits">
+      
     </div>
     <input id="legText" maxlength="140" placeholder="e.g. Bijan Robinson over 85.5 rush yards" style="width:100%">
     <div class="actions">
@@ -205,7 +205,7 @@ textarea{width:100%;min-height:150px;margin-top:10px;font:.85rem/1.4 var(--body)
     <textarea id="legOut" readonly hidden aria-label="All legs"></textarea>
     <details class="panel" style="margin-top:20px;padding:12px 14px">
       <summary style="display:block;padding:0;font-weight:600;cursor:pointer">Record how it went</summary>
-      <p class="note" style="margin:8px 0 10px">Whoever placed the bet fills this in, using their own team and PIN above.</p>
+      <p class="note" style="margin:8px 0 10px">Whoever placed the bet fills this in, using their own team above.</p>
       <div class="pickwrap">
         <label for="stStatus">Result</label><select id="stStatus"><option value="pending">Pending</option><option value="hit">Hit</option><option value="miss">Miss</option></select>
         <label for="stOdds">Odds</label><input id="stOdds" maxlength="20" placeholder="+1400" style="width:6rem">
@@ -244,11 +244,12 @@ textarea{width:100%;min-height:150px;margin-top:10px;font:.85rem/1.4 var(--body)
 <h2>How it's built</h2>
 <p>Player projections come from Sleeper's weekly feed, rescored with this league's rules (6-point passing TDs, full PPR, custom kicker and defense scoring). Each week the model starts the highest-projected legal lineup from active roster players; taxi and IR spots are excluded and players on bye score zero.</p>
 <p>Power score blends the rest-of-season rating with actual points versus average; actual results count 10% after week 1 and grow to 50% by week 9. Win chances assume each team's weekly score varies by about 30 points around its projection. Playoff seeding uses wins, then points for, and the bracket runs 4 vs 5 and 3 vs 6 in week 15, with the winners facing seeds 1 and 2 in week 16 and the final in week 17.</p>
-<p>The loser's parlay board is on the honor system: everyone adds a leg before Sunday 1:00 PM Eastern, the previous week's low scorer places it, and whoever placed it records the result.</p>
+<p>Picks and legs are on the honor system, with no passwords: anyone with the link can save for any team.</p>
+<p>The loser's parlay board works the same way: everyone adds a leg before Sunday 1:00 PM Eastern, the previous week's low scorer places it, and whoever placed it records the result.</p>
 <p>Data refreshes every morning from Sleeper. Spreads are the projected margin rounded to the nearest half point and are frozen once posted. Later-week projections are rougher and don't know about future injuries or trades.</p>
 </section>
 </main>
-<script src="config.js"></script>
+<script src="config.js?v=2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -363,7 +364,7 @@ async function pickem(DATA,T,byId){
   $('pickTitle').textContent=`Week ${wk} pick'em against the spread`;
   if(!ready){$('pickSetup').hidden=false;$('pickUI').hidden=true;$('board2').innerHTML='<div class="empty">Leaderboard appears once pick\'em is connected.</div>';return}
   const sb=client();
-  const picker=$('picker'), pin=$('pin'), note=$('saveNote');
+  const picker=$('picker'), note=$('saveNote');
   T.forEach(t=>picker.insertAdjacentHTML('beforeend',`<option value="${t.rid}">${esc(t.name)}</option>`));
   const prefs=store.get('hubpick')||{}; if(prefs.team) picker.value=prefs.team;
   let mine={}, locked=false, lockAt=null;
@@ -393,17 +394,17 @@ async function pickem(DATA,T,byId){
   }
   $('games').addEventListener('click',e=>{const b=e.target.closest('.side');if(!b||locked)return;mine[b.dataset.m]=Number(b.dataset.r);delete note.dataset.hold;renderGames()});
   picker.addEventListener('change',()=>{prefs.team=picker.value;store.set('hubpick',prefs);mine={};renderGames()});
-  const check=()=>{if(!picker.value){note.textContent='Choose your team first.';return false}if(!/^\d{4,8}$/.test(pin.value)){note.textContent='Enter a 4–8 digit PIN.';return false}return true};
+  const check=()=>{if(!picker.value){note.textContent='Choose your team first.';return false}return true};
   const hold=t=>{note.dataset.hold=1;note.textContent=t};
   $('save').addEventListener('click',async()=>{
     if(!check())return; $('save').disabled=true; hold('Saving…');
-    const {error}=await sb.rpc('submit_picks',{p_team:Number(picker.value),p_pin:pin.value,p_week:wk,p_picks:mine});
+    const {error}=await sb.rpc('submit_picks',{p_team:Number(picker.value),p_pin:'0000',p_week:wk,p_picks:mine});
     hold(error?error.message:'Picks saved. You can change them until lock.');
     renderGames(); loadIn();
   });
   $('load').addEventListener('click',async()=>{
     if(!check())return; hold('Loading…');
-    const {data,error}=await sb.rpc('get_my_picks',{p_team:Number(picker.value),p_pin:pin.value,p_week:wk});
+    const {data,error}=await sb.rpc('get_my_picks',{p_team:Number(picker.value),p_pin:'0000',p_week:wk});
     if(error){hold(error.message);return}
     if(!data){hold('No saved picks for this team yet.');return}
     mine=data; hold('Loaded your saved picks.'); renderGames();
@@ -450,7 +451,7 @@ async function parlay(DATA,T,byId){
   const sb=client(), wk=DATA.week;
   if(!sb){$('parlaySetup').hidden=false;$('parlayUI').hidden=true;return}
   const prefs=store.get('hubpick')||{};
-  const team=$('legTeam'), pin=$('legPin'), text=$('legText'), note=$('legNote');
+  const team=$('legTeam'), text=$('legText'), note=$('legNote');
   T.forEach(t=>team.insertAdjacentHTML('beforeend',`<option value="${t.rid}">${esc(t.name)}</option>`));
   if(prefs.team) team.value=prefs.team;
   team.addEventListener('change',()=>{prefs.team=team.value;store.set('hubpick',prefs);fill()});
@@ -492,10 +493,10 @@ async function parlay(DATA,T,byId){
   }
   await fill();
 
-  const check=()=>{if(!team.value){note.textContent='Choose your team first.';return false}if(!/^\d{4,8}$/.test(pin.value)){note.textContent='Enter your 4–8 digit PIN.';return false}return true};
+  const check=()=>{if(!team.value){note.textContent='Choose your team first.';return false}return true};
   $('legSave').addEventListener('click',async()=>{
     if(!check())return; note.textContent='Saving…';
-    const {data,error}=await sb.rpc('submit_leg',{p_team:Number(team.value),p_pin:pin.value,p_week:wk,p_leg:text.value});
+    const {data,error}=await sb.rpc('submit_leg',{p_team:Number(team.value),p_pin:'0000',p_week:wk,p_leg:text.value});
     note.textContent=error?error.message:(data==='removed'?'Leg removed.':'Leg saved. Change it any time before the deadline.');
     fill();
   });
@@ -508,7 +509,7 @@ async function parlay(DATA,T,byId){
   });
   $('stSave').addEventListener('click',async()=>{
     if(!check())return; $('stNoteMsg').textContent='Saving…';
-    const {error}=await sb.rpc('settle_parlay',{p_team:Number(team.value),p_pin:pin.value,p_week:wk,p_status:$('stStatus').value,p_odds:$('stOdds').value,p_note:$('stNote').value});
+    const {error}=await sb.rpc('settle_parlay',{p_team:Number(team.value),p_pin:'0000',p_week:wk,p_status:$('stStatus').value,p_odds:$('stOdds').value,p_note:$('stNote').value});
     $('stNoteMsg').textContent=error?error.message:'Result saved.';
     hist();
   });
