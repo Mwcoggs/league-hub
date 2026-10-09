@@ -325,6 +325,123 @@ for rid, t in teams.items():
     else:
         t["status"] = "Purgatory"
 
+import hashlib
+
+def pick(opts, rid, salt):
+    """Deterministic choice that rotates week to week, so the jokes don't go stale."""
+    k = hashlib.md5(f"{teams[rid]['name']}|{cur_week}|{salt}".encode()).hexdigest()
+    return opts[int(k, 16) % len(opts)]
+
+def jab(rid):
+    """One unkind sentence, chosen from whatever this team is worst at."""
+    t = teams[rid]
+    eff = t["eff"] or 100
+    left = t["left"]
+    bench = t["bench"]
+    po = t["po"] * 100
+    opts = []
+    if t["luck"] >= 0.8:
+        opts += [f"The schedule has been doing volunteer work on their behalf.",
+                 f"Somewhere there is a loss they earned and never received.",
+                 f"They are winning games the box score says they lost."]
+    if t["luck"] <= -0.8:
+        opts += ["Every week they load up and run into the one team that went off.",
+                 "The league's designated speed bump: good scores, catastrophic timing.",
+                 "They have been mugged by the schedule and nobody filed a report."]
+    if eff < 88:
+        opts += [f"They have left {left:.0f} points on the bench this year, which is a strategy if you squint.",
+                 f"{left:.0f} points on the bench. The roster is fine; the manager is the problem.",
+                 "Setting the lineup appears to be an optional part of the format for them."]
+    if bench and bench[1] >= 25:
+        opts += [f"{bench[0]} put up {bench[1]:.0f} in week {bench[2]} from the comfort of their bench."]
+    if (t["core_age"] or 0) >= 27.5 and po < 40:
+        opts += ["The core is older than the rebuild they keep refusing to start.",
+                 "This roster is aging in real time and still not winning anything."]
+    if (t["core_age"] or 99) <= 25 and po >= 60:
+        opts += ["Young and good, which is the most annoying combination to play against."]
+    if po >= 90:
+        opts += ["At this point the only real threat to them is their own lineup card.",
+                 "They are so far ahead that the rest of the league is playing for second."]
+    if po <= 10:
+        opts += ["Mathematically alive in the way a houseplant is alive.",
+                 "The playoff odds round to a rumor.",
+                 "They are playing out the string and the string is short."]
+    if len(t["out"]) >= 3:
+        opts += ["The injury report is longer than the starting lineup."]
+    return pick(opts, rid, "jab") if opts else None
+
+VERDICTS = {
+    "Contending": ["This is a contender. Patch the one weak slot and ride it.",
+                   "Legitimate contender. If this doesn't end in a title, the excuses are going to be elaborate.",
+                   "Push now. The roster is good enough that finishing second would be a choice."],
+    "In the hunt": ["A bubble team: one trade or one bad month decides which way the season breaks.",
+                    "Firmly in the middle, which is the worst place to be and the easiest place to stay.",
+                    "One decisive move from relevance, one quiet month from the lottery."],
+    "Building": ["The young core says build. Sell anyone over 28 while the price is good and stack picks.",
+                 "Keep building. Patience is cheaper than the trade it would take to win now.",
+                 "The future is genuinely bright, which is what everyone says before trading it away for a 7-7 season."],
+    "Purgatory": ["Purgatory: not good enough to chase it, not young enough to wait it out. Pick a direction and commit.",
+                  "Stuck in the middle. The middle of the road is where the roadkill is.",
+                  "Neither contending nor rebuilding, which is a decision disguised as patience."],
+}
+
+import hashlib
+
+def pick(opts, rid, salt):
+    """Deterministic choice that rotates week to week, so the jokes don't go stale."""
+    k = hashlib.md5(f"{teams[rid]['name']}|{cur_week}|{salt}".encode()).hexdigest()
+    return opts[int(k, 16) % len(opts)]
+
+def jab(rid):
+    """One unkind sentence, drawn from whatever this team is worst at."""
+    t = teams[rid]
+    eff, left, bench, po = (t["eff"] or 100), t["left"], t["bench"], t["po"] * 100
+    opts = []
+    if t["luck"] >= 0.8:
+        opts += ["The schedule has been doing volunteer work on their behalf.",
+                 "Somewhere there is a loss they earned and never received.",
+                 "They keep winning games the box score says they lost."]
+    if t["luck"] <= -0.8:
+        opts += ["Every week they load up and run into the one team that went off.",
+                 "The league's designated speed bump: good scores, catastrophic timing.",
+                 "They have been mugged by the schedule and nobody filed a report."]
+    if eff < 88:
+        opts += [f"They have left {left:.0f} points on the bench this year, which is a strategy if you squint.",
+                 f"{left:.0f} points on the bench so far. The roster is fine; the manager is the variable.",
+                 "Setting the lineup appears to be optional in their format."]
+    if bench and bench[1] >= 25:
+        opts += [f"{bench[0]} put up {bench[1]:.0f} in week {bench[2]} from the comfort of their bench."]
+    if (t["core_age"] or 0) >= 27.5 and po < 40:
+        opts += ["The core is older than the rebuild they keep refusing to start.",
+                 "This roster is aging in real time and still not winning anything."]
+    if (t["core_age"] or 99) <= 25 and po >= 60:
+        opts += ["Young and good, which is the most annoying combination to play against."]
+    if po >= 90:
+        opts += ["At this point the only real threat to them is their own lineup card.",
+                 "They are far enough ahead that everyone else is playing for second."]
+    if po <= 10:
+        opts += ["Mathematically alive the way a houseplant is alive.",
+                 "The playoff odds round down to a rumor.",
+                 "They are playing out the string, and the string is short."]
+    if len(t["out"]) >= 3:
+        opts += ["The injury report is longer than the starting lineup."]
+    return pick(opts, rid, "jab") if opts else None
+
+VERDICTS = {
+    "Contending": ["A real contender. Patch the one weak slot and ride it.",
+                   "Legitimate contender. If this doesn't end in a title, the excuses will have to be elaborate.",
+                   "Push now. This roster is good enough that finishing second would be a choice."],
+    "In the hunt": ["A bubble team: one trade or one bad month decides which way the season breaks.",
+                    "Firmly in the middle, which is the worst place to be and the easiest place to stay.",
+                    "One decisive move from relevance, one quiet month from the lottery."],
+    "Building": ["The young core says build. Sell anyone over 28 while the price is good and stack picks.",
+                 "Keep building. Patience is cheaper than the trade it would take to win now.",
+                 "The future is genuinely bright, which is what everyone says right before trading it for a 7–7 season."],
+    "Purgatory": ["Purgatory: not good enough to chase it, not young enough to wait it out. Pick a direction and commit.",
+                  "Stuck in the middle, and the middle of the road is where the roadkill is.",
+                  "Neither contending nor rebuilding, which is a decision wearing a patience costume."],
+}
+
 def blurb(rid):
     t = teams[rid]
     po, ch = t["po"] * 100, t["champ"] * 100
@@ -363,13 +480,10 @@ def blurb(rid):
     s.append(f"Projection puts them at {t['proj_w']}–{t['proj_l']}, with {po:.0f}% playoff odds and "
              f"{'a real title shot at ' + format(ch, '.0f') + '%' if ch >= 15 else 'a title shot under ' + ('1%' if ch < 1 else format(ch, '.0f') + '%')}. "
              f"Rest of season they project {ordinal(rr)} in weekly scoring.")
-    verdict = {
-        "Contending": "This is a contender. Spend picks on the one weak slot and ride it.",
-        "In the hunt": "This is a bubble team: one trade or one bad month decides which way the season breaks.",
-        "Building": "The young core says build. Sell anyone over 28 while the price is good and stack picks.",
-        "Purgatory": "This is purgatory — not good enough to chase it, not young enough to wait it out. Pick a direction and commit.",
-    }[t["status"]]
-    s.append(verdict)
+    j = jab(rid)
+    if j:
+        s.append(j)
+    s.append(pick(VERDICTS[t["status"]], rid, "verdict"))
     return " ".join(s)
 
 for rid in teams:
