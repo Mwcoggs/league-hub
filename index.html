@@ -233,7 +233,7 @@ textarea{width:100%;min-height:150px;margin-top:10px;font:.85rem/1.4 var(--body)
 
 <section id="sched" role="tabpanel" hidden>
   <h2>Rest-of-season strength of schedule</h2>
-  <p class="lede">Average projected score of each opponent in the week you face them, byes included. The whole spread is under 5 points a week, so schedule is a small factor in this league.</p>
+  <p class="lede">Each opponent is valued at the <strong>best lineup they can start in a normal week</strong> — nobody's bye drags their number down, since you never face a team on its bye anyway. Players on IR, PUP or suspension still count against them. Bars show the gap from the league-average slate.</p>
   <div class="panel list" id="sos"></div>
   <h3>Weekly outlook</h3>
   <div class="pickwrap"><label for="pickT">Team</label><select id="pickT"></select></div>
@@ -243,7 +243,8 @@ textarea{width:100%;min-height:150px;margin-top:10px;font:.85rem/1.4 var(--body)
 <section class="method">
 <h2>How it's built</h2>
 <p>Player projections come from Sleeper's weekly feed, rescored with this league's rules (6-point passing TDs, full PPR, custom kicker and defense scoring). Each week the model starts the highest-projected legal lineup from active roster players; taxi and IR spots are excluded and players on bye score zero.</p>
-<p>Power score blends the rest-of-season rating with actual points versus average; actual results count 10% after week 1 and grow to 50% by week 9. Win chances assume each team's weekly score varies by about 30 points around its projection. Playoff seeding uses wins, then points for, and the bracket runs 4 vs 5 and 3 vs 6 in week 15, with the winners facing seeds 1 and 2 in week 16 and the final in week 17.</p>
+<p>Availability is applied on top of those projections, refreshed every morning. A player on injured reserve, PUP, the non-football injury list or suspension — whatever keeps him off the field — is a zero for the next four weeks and is discounted by half after that, because a return date is a guess. For the coming week only, Out counts as zero, Doubtful as 40% and Questionable as 90%. Everyone's current absences show up under their team in the rankings.</p>
+<p>Power score blends the rest-of-season rating with what teams have actually scored. Results now carry real weight: 50% by week 5 and about 70% by week 10, with recent weeks counting for more than September. Strength of schedule uses full-strength lineups, as described above, while the weekly win chances below it use each team's actual projection for that week, byes and all. Win chances assume each team's weekly score varies by about 30 points around its projection. Playoff seeding uses wins, then points for, and the bracket runs 4 vs 5 and 3 vs 6 in week 15, with the winners facing seeds 1 and 2 in week 16 and the final in week 17.</p>
 <p>Picks and legs are on the honor system, with no passwords: anyone with the link can save for any team.</p>
 <p>The loser's parlay board works the same way: everyone adds a leg before Sunday 1:00 PM Eastern, the previous week's low scorer places it, and whoever placed it records the result.</p>
 <p>Data refreshes every morning from Sleeper. Spreads are the projected margin rounded to the nearest half point and are frozen once posted. Later-week projections are rougher and don't know about future injuries or trades.</p>
@@ -289,8 +290,9 @@ $('board').innerHTML=T.map(t=>{
     <span><span class="tn">${esc(t.name)}</span><br><span class="ow">${esc(t.owner)}, ${t.w}–${t.l}${t.t?'–'+t.t:''}</span></span>
     <span class="rt" style="color:${b.c}">${sg(t.power)}<small>power</small></span>
     ${b.html}
-    <span class="stats"><span>ROS <strong>${t.ros.toFixed(1)}</strong>/wk</span><span>Exp. wins <strong>${t.xw.toFixed(1)}</strong></span><span>Playoffs <strong>${t.po}%</strong></span><span>Title <strong style="color:var(--gold)">${t.champ<1?'<1':t.champ.toFixed(0)}%</strong></span></span>
+    <span class="stats"><span>ROS <strong>${t.ros.toFixed(1)}</strong>/wk</span><span>Full strength <strong>${(t.peak??t.ros).toFixed(1)}</strong></span><span>Exp. wins <strong>${t.xw.toFixed(1)}</strong></span><span>Playoffs <strong>${t.po}%</strong></span><span>Title <strong style="color:var(--gold)">${t.champ<1?'<1':t.champ.toFixed(0)}%</strong></span></span>
   </summary><div class="detail">
+    ${(t.out&&t.out.length)?`<h4>Out or limited right now</h4><div class="chips" style="padding:0 0 4px">${t.out.map(o=>`<span class="chip">${esc(o[0])} · ${esc(o[1])}${o[2]>0?` · ${Math.round(o[2]*100)}%`:''}</span>`).join('')}</div>`:''}
     <h4>Positional edge vs. league average (pts/wk)</h4><div class="pos">${pos}</div>
     ${core?`<h4>Projected week ${DATA.lineup_week} lineup</h4><ul class="core">${core}</ul>`:''}
   </div></details>`}).join('');
@@ -336,7 +338,7 @@ $('board').innerHTML=T.map(t=>{
 // schedule
 (function(){
   const S=[...T].sort((a,b)=>a.sosr-b.sosr), mx=Math.max(...T.map(t=>Math.abs(t.sosd)))||1;
-  $('sos').innerHTML=S.map(t=>{const b=divBar(t.sosd,mx,false);return `<div class="lrow"><span class="t"><b>${t.sosr}. ${esc(t.name)}</b><span>Opponents average ${t.sos.toFixed(1)}</span></span>${b.html}<span class="v" style="color:${b.c}">${sg(t.sosd)}</span></div>`}).join('');
+  $('sos').innerHTML=S.map(t=>{const b=divBar(t.sosd,mx,false);return `<div class="lrow"><span class="t"><b>${t.sosr}. ${esc(t.name)}</b><span>Opponents average ${t.sos.toFixed(1)} at full strength${t.sos_live!=null?`, ${t.sos_live.toFixed(1)} as scheduled`:''}</span></span>${b.html}<span class="v" style="color:${b.c}">${sg(t.sosd)}</span></div>`}).join('');
   const pick=$('pickT'), rows=$('rows');
   T.forEach(t=>pick.insertAdjacentHTML('beforeend',`<option value="${t.rid}">${esc(t.name)}</option>`));
   function render(rid){let h='';Object.keys(DATA.weekly[rid]||{}).map(Number).sort((a,b)=>a-b).forEach(w=>{const o=DATA.sched[w][rid],me=DATA.weekly[rid][w],op=DATA.weekly[o][w];const pc=Math.round(wpc(me,op)*100),c=pc>=50?'var(--pos)':'var(--neg)';

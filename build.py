@@ -16,6 +16,15 @@ POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"]
 SLOTS = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX", "K", "DEF"]
 FLEX = ("RB", "WR", "TE")
 
+# Availability. Long-term statuses knock a player out of the lineup for the next
+# LT_WEEKS weeks and discount him after that, since a return date is a guess.
+# Week-only designations only affect the upcoming week.
+LT_STATUS = {"Injured Reserve", "Physically Unable to Perform", "Non Football Injury", "Suspended"}
+LT_INJURY = {"IR", "PUP", "NFI", "Sus", "DNR", "RET"}
+WEEK_FACTOR = {"Out": 0.0, "NA": 0.0, "COV": 0.0, "Doubtful": 0.4, "Questionable": 0.9}
+LT_WEEKS = 4             # weeks a long-term absence is treated as a zero
+LT_AFTER = 0.5           # discount once he could plausibly be back
+
 def get(url, tries=4):
     for i in range(tries):
         try:
@@ -52,6 +61,17 @@ def proj_week(w):
 
 future_weeks = [w for w in range(max(cur_week, 1), 18)]
 P = {w: proj_week(w) for w in future_weeks}
+
+def avail(pid, w, cur):
+    """Multiplier for a player's projection in week w, and why it isn't 1."""
+    p = players.get(pid) or {}
+    st, inj = p.get("status"), p.get("injury_status")
+    if st in LT_STATUS or inj in LT_INJURY:
+        tag = inj if inj in LT_INJURY else st
+        return (0.0, tag) if w < cur + LT_WEEKS else (LT_AFTER, tag)
+    if w == cur and inj in WEEK_FACTOR:
+        return WEEK_FACTOR[inj], inj
+    return 1.0, None
 
 def positions_of(pid):
     if pid in players:
@@ -108,7 +128,27 @@ done = [w for w in range(1, min(cur_week, REG_SEASON_END + 1)) if any((x.get("po
 proj = {rid: {} for rid in teams}
 for rid, t in teams.items():
     for w in future_weeks:
-        proj[rid][w] = best_lineup([(P[w].get(p, 0.0), p) for p in t["active"]])
+        proj[rid][w] = best_lineup([(P[w].get(p, 0.0) * avail(p, w, cur_week)[0], p) for p in t["active"]])
+    # who availability is keeping out of the lineup right now
+    t["out"] = []
+    for p in t["active"]:
+        f, tag = avail(p, cur_week, cur_week)
+        if f < 1 and (P[cur_week].get(p, 0.0) > 0 or tag in LT_INJURY or tag in LT_STATUS):
+            t["out"].append([name_of(p), tag or "out", round(f, 2)])
+    t["out"].sort(key=lambda x: x[2])
+    t["out"] = t["out"][:6]
+
+# Full-strength lineup: what a team can start in a normal week, with nobody on a
+# bye. Each player is valued at his average projection over the weeks his team
+# actually plays, so byes stop deflating anyone. This is the basis for strength
+# of schedule, since you never face an opponent in their bye week anyway.
+base_pts = {}
+for pid in {p for t in teams.values() for p in t["active"]}:
+    vals = [P[w].get(pid, 0.0) for w in future_weeks if w <= REG_SEASON_END and P[w].get(pid, 0.0) > 0]
+    lt = (players.get(pid) or {}).get("status") in LT_STATUS or (players.get(pid) or {}).get("injury_status") in LT_INJURY
+    base_pts[pid] = (statistics.mean(vals) if vals else 0.0) * (LT_AFTER if lt else 1.0)
+for rid, t in teams.items():
+    t["peak"] = best_lineup([(base_pts.get(p, 0.0), p) for p in t["active"]])[0]
 ros_weeks = [w for w in future_weeks if w <= REG_SEASON_END]
 calc_weeks = ros_weeks or [w for w in future_weeks] or [REG_SEASON_END]
 for rid, t in teams.items():
@@ -138,14 +178,19 @@ for w in done:
                     t["bench"] = (name_of(p), round(pp.get(p, 0), 1), w)
 gp = len(done)
 league_game_avg = statistics.mean(s for t in teams.values() for s in t["scores"]) if gp else 0
-w_act = gp / (gp + 9)
+w_act = gp / (gp + 4)      # results outweigh projections from about week 5 on
+DECAY = 0.85               # recent weeks count for more
+
+def recent_avg(xs):
+    ws = [DECAY ** (len(xs) - 1 - i) for i in range(len(xs))]
+    return sum(x * k for x, k in zip(xs, ws)) / sum(ws)
 for rid, t in teams.items():
     games = t["apw"] + t["apl"]
     t["luck"] = (t["w"] - (t["apw"] / games) * gp) if games else 0.0
     t["eff"] = (t["act"] / t["opt"] * 100) if t["opt"] else None
     t["left"] = t["opt"] - t["act"]
     t["rating"] = t["ros"] - avg
-    actual_edge = (statistics.mean(t["scores"]) - league_game_avg) if gp else 0
+    actual_edge = (recent_avg(t["scores"]) - league_game_avg) if gp else 0
     t["power"] = (1 - w_act) * t["rating"] + w_act * actual_edge
 
 def wp(a, b):
@@ -153,8 +198,10 @@ def wp(a, b):
 
 # ---- strength of schedule + expected wins
 for rid, t in teams.items():
-    opp = [proj[sched[w][rid][0]][w][0] for w in ros_weeks if rid in sched.get(w, {})]
+    opp = [teams[sched[w][rid][0]]["peak"] for w in ros_weeks if rid in sched.get(w, {})]
     t["sos"] = statistics.mean(opp) if opp else 0.0
+    live = [proj[sched[w][rid][0]][w][0] for w in ros_weeks if rid in sched.get(w, {})]
+    t["sos_live"] = statistics.mean(live) if live else 0.0
     t["xw"] = t["w"] + sum(wp(proj[rid][w][0], proj[sched[w][rid][0]][w][0]) for w in ros_weeks if rid in sched.get(w, {}))
 sos_avg = statistics.mean(t["sos"] for t in teams.values())
 
@@ -233,6 +280,7 @@ for i, rid in enumerate(order):
     T.append(dict(
         rid=rid, rank=i + 1, name=t["name"], owner=t["owner"], w=t["w"], l=t["l"], t=t["t"],
         pf=round(t["pf"], 1), pa=round(t["pa"], 1), ros=round(t["ros"], 1), power=round(t["power"], 1),
+        peak=round(t["peak"], 1), out=t["out"], sos_live=round(t["sos_live"], 1),
         sos=round(t["sos"], 1), sosd=round(t["sos"] - sos_avg, 1), sosr=sos_rank[rid], xw=round(t["xw"], 1),
         po=round(t["po"] * 100), champ=round(t["champ"] * 100, 1), final=round(t["final"] * 100),
         seeds=t["seeds"], exp_seed=round(t["exp_seed"], 2), apw=t["apw"], apl=t["apl"], luck=round(t["luck"], 2),
