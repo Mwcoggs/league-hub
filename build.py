@@ -285,6 +285,11 @@ eff_rank = {r: i + 1 for i, r in enumerate(sorted(teams, key=lambda r: -(teams[r
 ap_rank = {r: i + 1 for i, r in enumerate(sorted(teams, key=lambda r: -(teams[r]["apw"] / max(teams[r]["apw"] + teams[r]["apl"], 1))))}
 SHAPE_KEYS = ["QB", "RB", "WR", "TE", "DEF"]
 
+def art(n):
+    """a/an for a number read aloud (8 and 11 take 'an')."""
+    r = str(round(n))          # match the rounding used when the number is printed
+    return "an" if r[0] == "8" or r[:2] == "11" else "a"
+
 def ordinal(n):
     return f"{n}{'th' if 11 <= n % 100 <= 13 else {1:'st',2:'nd',3:'rd'}.get(n % 10, 'th')}"
 
@@ -361,86 +366,160 @@ for rid, t in teams.items():
     t["pick_count"] = len(picks)
     t["firsts"] = sum(1 for sy, rn, og in picks if rn == 1)
 
+ORDER_IDX = {r: i for i, r in enumerate(sorted(teams, key=lambda r: -teams[r]["power"]))}
+
+def V(rid, salt, opts):
+    """Spread phrasings across the league so no two write-ups sound alike,
+    and rotate them week to week."""
+    off = sum(ord(c) for c in salt) + cur_week * 3
+    return opts[(ORDER_IDX[rid] + off) % len(opts)]
+
 def blurb(rid):
     t = teams[rid]
     po, ch = t["po"] * 100, t["champ"] * 100
-    pr, rr = pf_rank[rid], ros_rank[rid]
+    pr, rr, apr = pf_rank[rid], ros_rank[rid], ap_rank[rid]
     best = max(SHAPE_KEYS, key=lambda k: pos[rid][k] - pos_avg[k])
     worst = min(SHAPE_KEYS, key=lambda k: pos[rid][k] - pos_avg[k])
     gap_b, gap_w = pos[rid][best] - pos_avg[best], pos[rid][worst] - pos_avg[worst]
-    names = ", ".join(a[0] for a in t["assets"][:3])
-    age = t["core_age"]
-    s = []
-    rec = f"{t['w']}–{t['l']}"
+    a = t["assets"]
+    one = a[0][0] if a else None
+    names = ", ".join(x[0] for x in a[:3])
+    two = " and ".join(x[0] for x in a[:2]) if len(a) >= 2 else one
+    age, rec, ap = t["core_age"], f"{t['w']}–{t['l']}", f"{t['apw']}–{t['apl']}"
+    out = []
 
-    # 1. what the record is actually worth
+    # 1 — record against all-play
     if t["luck"] >= 0.8:
-        s.append(f"{rec} overstates them. They score {ordinal(pr)} in the league and are {t['apw']}–{t['apl']} "
-                 f"in all-play, {ordinal(ap_rank[rid])} against the field as a whole — the wins have come from the draw, not the roster.")
+        out.append(V(rid, "lucky", [
+            f"{rec} is a mirage. The all-play record is {ap}, {ordinal(apr)} in the league, and they score {ordinal(pr)} — "
+            f"the draw has been carrying them.",
+            f"Take the schedule away and this is a {ordinal(apr)}-place team: {ap} against the field, {ordinal(pr)} in points. "
+            f"{rec} is the wrapping, not the gift.",
+            f"They are {rec} and {ap} in all-play, which is the gap between a kind schedule and an honest one. "
+            f"Scoring sits {ordinal(pr)}.",
+        ]))
     elif t["luck"] <= -0.8:
-        s.append(f"{rec} understates them. They score {ordinal(pr)} in the league and are {t['apw']}–{t['apl']} "
-                 f"in all-play, {ordinal(ap_rank[rid])} against the field as a whole — this is a better team than the standings say.")
+        out.append(V(rid, "unlucky", [
+            f"{rec} is a lie told by the schedule. All-play says {ap}, {ordinal(apr)} in the league, on {ordinal(pr)}-place scoring.",
+            f"Few teams are this much better than their record: {ap} against the field, {ordinal(pr)} in points, and nothing to "
+            f"show for it but {rec}.",
+            f"{ap} in all-play, {ordinal(pr)} in scoring, {rec} in the standings. The wins will come if the scores hold.",
+        ]))
     else:
-        s.append(f"{rec} is honest. They score {ordinal(pr)} in the league and are {t['apw']}–{t['apl']} in all-play, "
-                 f"{ordinal(ap_rank[rid])} against the field as a whole.")
+        out.append(V(rid, "fair", [
+            f"{rec} is the right record. All-play backs it at {ap}, {ordinal(apr)} in the league, with scoring {ordinal(pr)}.",
+            f"Nothing is hiding here: {rec}, {ap} in all-play, {ordinal(pr)} in points scored.",
+            f"They have earned {rec}. Against the whole field they are {ap}, {ordinal(apr)}, and they score {ordinal(pr)}.",
+        ]))
 
-    # 2. roster shape
-    s.append(f"The roster runs through {names}." if names else "Nothing on this roster qualifies as a centerpiece.")
-    shape = []
-    if gap_b >= 2:
-        shape.append(f"{best} is the one real edge, about {gap_b:.0f} points a week on the field")
-    if gap_w <= -2:
-        shape.append(f"{worst} costs them roughly {abs(gap_w):.0f} a week")
+    # 2 — the spine of the roster
+    if names:
+        out.append(V(rid, "spine", [
+            f"{names} carry the weight.",
+            f"Everything starts with {two}.",
+            f"{one} is the engine, with {' and '.join(x[0] for x in a[1:3])} behind him." if len(a) >= 3 else f"{one} is the engine.",
+            f"The spine is {names}.",
+        ]))
+    else:
+        out.append("There is no centerpiece here, which is most of the problem.")
+
+    # 3 — shape
+    shape = None
+    if gap_b >= 2 and gap_w <= -2:
+        shape = V(rid, "both", [
+            f"{best} is the edge at roughly {gap_b:.0f} points a week, {worst} the leak at about {abs(gap_w):.0f}.",
+            f"They win the {best} slot by {gap_b:.0f} a week and give most of it back at {worst}, down {abs(gap_w):.0f}.",
+            f"{art(gap_b).capitalize()} {gap_b:.0f}-point weekly edge at {best}, {art(abs(gap_w))} {abs(gap_w):.0f}-point hole at {worst}.",
+        ])
+    elif gap_b >= 2:
+        shape = V(rid, "edge", [
+            f"{best} is the one place they clearly beat the field, worth about {gap_b:.0f} a week.",
+            f"The {best} group is {gap_b:.0f} points a week better than everyone else's.",
+            f"Their edge is {best}, roughly {gap_b:.0f} points of it every week.",
+        ])
+    elif gap_w <= -2:
+        shape = V(rid, "hole", [
+            f"{worst} is the wound, costing about {abs(gap_w):.0f} points a week.",
+            f"Nothing works at {worst}, and it runs {abs(gap_w):.0f} a week against them.",
+            f"They lose roughly {abs(gap_w):.0f} points a week at {worst} alone.",
+        ])
     if shape:
-        s.append(shape[0][0].upper() + shape[0][1:] + (f", while {shape[1]}" if len(shape) > 1 else "") + ".")
+        out.append(shape)
 
-    # 3. things that are quietly deciding the season
-    notes = []
+    # 4 — self-inflicted damage
     if (t["eff"] or 100) < 88:
-        notes.append(f"{t['left']:.0f} points have died on their bench, {ordinal(eff_rank[rid])} in lineup efficiency")
-    if len(t["out"]) >= 3:
-        notes.append(f"{len(t['out'])} starters are hurt or limited right now")
-    if notes:
-        s.append(notes[0][0].upper() + notes[0][1:] + (f"; {notes[1]}" if len(notes) > 1 else "") + ".")
+        out.append(V(rid, "bench", [
+            f"{t['left']:.0f} points have died on their bench, {ordinal(eff_rank[rid])} in lineup efficiency.",
+            f"Lineup decisions have cost them {t['left']:.0f} points, {ordinal(eff_rank[rid])} in the league at setting a roster.",
+            f"They rank {ordinal(eff_rank[rid])} at starting the right guys, {t['left']:.0f} points of it wasted.",
+        ]))
+    elif len(t["out"]) >= 3:
+        out.append(f"{len(t['out'])} starters are hurt or limited heading into this week.")
 
-    # 4. age and the window
+    # 5 — age and window
     if age:
         if age <= 25.8:
-            s.append(f"The core is {age} years old weighted by production, young enough that the best version of this team is still ahead of it.")
+            out.append(V(rid, "young", [
+                f"At {age} years old by production, the best version of this roster has not arrived yet.",
+                f"A {age}-year-old core means the clock is running toward them, not away.",
+                f"Production-weighted age of {age}: this team gets better on its own.",
+            ]))
         elif age >= 27.5:
-            s.append(f"The core is {age} years old weighted by production — "
-                     + ("this is as good as it gets, so it has to be now." if po >= 50 else
-                        "aging out of relevance without having been relevant."))
+            out.append(V(rid, "old", [
+                f"The {age}-year-old core is the problem — " + ("it has to happen now." if po >= 50 else "it is getting worse, not better."),
+                f"At {age} by production, " + ("this is the last good year of it." if po >= 50 else "they are aging out without ever arriving."),
+                f"Age {age} weighted by production: " + ("win now or don't bother." if po >= 50 else "every month of patience costs them money."),
+            ]))
         else:
-            s.append(f"The core is {age} years old weighted by production, squarely in its prime.")
+            out.append(V(rid, "prime", [
+                f"The core is {age}, dead in its prime.",
+                f"At {age} years old by production, nothing about the timeline forces a decision.",
+                f"A {age}-year-old core buys them a year either way.",
+            ]))
 
-    # 5. where it ends up
-    title = (f"a genuine title shot at {ch:.0f}%" if ch >= 15 else
-             f"a {ch:.0f}% title shot" if ch >= 1 else "effectively no title equity")
-    s.append(f"The model lands them at {t['proj_w']}–{t['proj_l']} with {po:.0f}% playoff odds and {title}, "
-             f"{ordinal(rr)} in rest-of-season scoring.")
+    # 6 — the projection
+    title = (f"{ch:.0f}% to win it" if ch >= 15 else f"{ch:.0f}% on the title" if ch >= 1 else "no real title equity")
+    out.append(V(rid, "proj", [
+        f"The model finishes them {t['proj_w']}–{t['proj_l']}: {po:.0f}% to make the playoffs, {title}, {ordinal(rr)} in scoring the rest of the way.",
+        f"Projected {t['proj_w']}–{t['proj_l']}, {po:.0f}% playoff odds, {title}. They project {ordinal(rr)} in weekly scoring from here.",
+        f"{t['proj_w']}–{t['proj_l']} is the projection, with playoff odds at {po:.0f}% and {title}, on {ordinal(rr)}-ranked scoring going forward.",
+    ]))
 
-    # 6. the verdict, blunt
+    # 7 — verdict
     cap = t["firsts"]
     if t["status"] == "Contending":
-        s.append(f"This is a contender. {'Spend a first on ' + worst if cap else 'Fix ' + worst} and stop hedging — "
-                 f"windows like this close without warning.")
+        out.append(V(rid, "contend", [
+            f"Buy. The {worst} slot is the only thing standing between this roster and a title, and it is cheaper to fix now than in November.",
+            "This is a championship roster. Nothing about it argues for patience.",
+            f"The window is open and wide. Spend{' a first' if cap else ''} on {worst} and go.",
+        ]))
     elif t["status"] == "In the hunt":
-        s.append("This is the bubble. Half a move in either direction decides the season, and standing still "
-                 "means finishing seventh with nothing to show for it.")
+        out.append(V(rid, "hunt", [
+            "Decide. This roster is close enough to buy into and good enough to sell out of, and doing neither ends at seventh.",
+            f"One real move at {worst} makes them dangerous; standing pat makes them forgettable.",
+            "They are the definition of a coin flip, and coin flips do not win leagues.",
+        ]))
     elif t["status"] == "Building":
-        s.append(f"The build is real. {cap} first-rounders in hand and a young core — sell every veteran over 28 "
-                 f"while somebody still wants them." if cap else
-                 "The build is real. Sell every veteran over 28 while somebody still wants them.")
+        out.append(V(rid, "build", [
+            f"Stay the course. {cap} first-rounders and a young core is a plan — the only mistake available is trading it for a wild-card week." if cap
+            else "Stay the course. The young core is the plan; the only mistake available is trading it for a wild-card week.",
+            "Sell anyone the wrong side of 28 and let the kids take the hits. This gets good in a year.",
+            "The timeline is a year out and that's fine. Price veterans aggressively and keep collecting.",
+        ]))
     elif t["status"] == "Should be tanking":
-        s.append(f"There is no season here to save. "
-                 f"{'The ' + str(cap) + ' first-rounders are the asset that matters now' if cap else 'The only currency left is next year'} — "
-                 f"move every veteran with a pulse, lose on purpose, and come back with the top of the draft.")
+        out.append(V(rid, "tank", [
+            f"There is nothing here to save. {'Those ' + str(cap) + ' first-rounders are the franchise now' if cap else 'Next spring is the only asset'} — "
+            f"sell every veteran with a name and finish last on purpose.",
+            "Lose properly. Half-measures here produce a 5–9 team with no picks, which is how franchises stay bad for three years.",
+            f"Blow it up. {one} is worth more to a contender in October than to this roster in December." if one else "Blow it up and start over.",
+        ]))
     else:
-        s.append(f"This is the bleak one: too old to wait, too thin to chase. "
-                 f"{'The ' + str(cap) + ' first-rounders are the only real assets left' if cap else 'There is almost nothing left to trade'} — "
-                 f"tear it down now, because next year this roster is worth less than it is today.")
-    return " ".join(s)
+        out.append(V(rid, "purg", [
+            "Too old to wait and too thin to chase — the worst place to be, and the easiest to stay. Pick a side.",
+            f"Nothing about this roster is going anywhere. {'The firsts are the only liquid assets' if cap else 'There is little left worth selling'}, and the price drops every week.",
+            "Neither direction is being chosen, which is itself the choice, and it is the wrong one.",
+        ]))
+    return " ".join(out)
 
 for rid in teams:
     teams[rid]["blurb"] = blurb(rid)
