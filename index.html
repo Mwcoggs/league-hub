@@ -136,6 +136,7 @@ textarea{width:100%;min-height:150px;margin-top:10px;font:.85rem/1.4 var(--body)
 </header>
 <nav role="tablist" aria-label="Sections">
   <button role="tab" data-tab="rank" aria-selected="true">Rankings</button>
+  <button role="tab" data-tab="profiles" aria-selected="false">Teams</button>
   <button role="tab" data-tab="bracket" aria-selected="false">Playoffs</button>
   <button role="tab" data-tab="pick" aria-selected="false">Pick'em</button>
   <button role="tab" data-tab="parlay" aria-selected="false">Parlay</button>
@@ -148,6 +149,12 @@ textarea{width:100%;min-height:150px;margin-top:10px;font:.85rem/1.4 var(--body)
   <h2>Power ranking</h2>
   <p class="lede">Rating is projected points per week above or below the league average of <strong id="avg"></strong>. Tap a team for positional edges and its projected lineup.</p>
   <div class="panel" id="board"></div>
+</section>
+
+<section id="profiles" role="tabpanel" hidden>
+  <h2>Team profiles</h2>
+  <p class="lede">Where each roster actually stands: projected finish, the assets it's built on, and whether the right move is to push, hold or tear it down. Rebuilt every morning from current rosters and results.</p>
+  <div id="profileList"></div>
 </section>
 
 <section id="bracket" role="tabpanel" hidden>
@@ -296,6 +303,27 @@ $('board').innerHTML=T.map(t=>{
     <h4>Positional edge vs. league average (pts/wk)</h4><div class="pos">${pos}</div>
     ${core?`<h4>Projected week ${DATA.lineup_week} lineup</h4><ul class="core">${core}</ul>`:''}
   </div></details>`}).join('');
+
+// team profiles
+(function(){
+  const cls={'Contending':'b-contend','In the hunt':'b-hunt','Building':'b-build','Purgatory':'b-purg'};
+  const el=$('profileList'); if(!el) return;
+  el.innerHTML=T.map(t=>{
+    const assets=(t.assets||[]).map(a=>`<span class="chip">${esc(a[0])} · ${esc(a[1])}${a[2]?' '+a[2]:''}</span>`).join('');
+    return `<article class="card">
+      <span class="badge ${cls[t.status]||'b-build'}">${esc(t.status||'')}</span>
+      <h3>${esc(t.name)}</h3>
+      <div class="who">${esc(t.owner)} · ${t.w}–${t.l} now · #${t.rank} power</div>
+      <div class="kpi">
+        <div><small>Projected</small><b>${t.proj_w}–${t.proj_l}</b></div>
+        <div><small>Playoffs</small><b>${t.po}%</b></div>
+        <div><small>Title</small><b style="color:var(--gold)">${t.champ<1?'<1':t.champ.toFixed(0)}%</b></div>
+        <div><small>Core age</small><b>${t.core_age??'—'}</b></div>
+      </div>
+      ${assets?`<div class="chips" style="padding:0 0 2px">${assets}</div>`:''}
+      <p class="read">${esc(t.blurb||'')}</p>
+    </article>`}).join('');
+})();
 
 // bracket
 (function(){

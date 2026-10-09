@@ -274,6 +274,107 @@ pos = {r: pos_breakdown(r) for r in teams}
 pos_avg = {k: statistics.mean(pos[r][k] for r in teams) for k in pos_keys}
 show_week = next((w for w in future_weeks if w in proj[order[0]]), None)
 
+# ---- team profiles: assets, window, and a written read on where each team stands
+GAMES = len(ros_weeks) + len(done)
+pf_rank = {r: i + 1 for i, r in enumerate(sorted(teams, key=lambda r: -teams[r]["pf"]))}
+ros_rank = {r: i + 1 for i, r in enumerate(sorted(teams, key=lambda r: -teams[r]["ros"]))}
+ap_rank = {r: i + 1 for i, r in enumerate(sorted(teams, key=lambda r: -(teams[r]["apw"] / max(teams[r]["apw"] + teams[r]["apl"], 1))))}
+SHAPE_KEYS = ["QB", "RB", "WR", "TE", "DEF"]
+
+def ordinal(n):
+    return f"{n}{'th' if 11 <= n % 100 <= 13 else {1:'st',2:'nd',3:'rd'}.get(n % 10, 'th')}"
+
+# Value over replacement: in a one-QB league the 25th-best QB is worth nothing,
+# so rank assets against the last starter the league would actually use.
+STARTERS = {"QB": 1.0, "RB": 2.7, "WR": 2.7, "TE": 1.2, "K": 1.0, "DEF": 1.0}
+by_pos = {}
+for pid, v in base_pts.items():
+    p0 = (positions_of(pid) or ["?"])[0]
+    by_pos.setdefault(p0, []).append(v)
+repl = {}
+for p0, vals in by_pos.items():
+    vals.sort(reverse=True)
+    n = int(round(STARTERS.get(p0, 1.0) * len(teams)))
+    repl[p0] = vals[min(n, len(vals)) - 1] if vals else 0.0
+
+def vor(pid):
+    return base_pts.get(pid, 0.0) - repl.get((positions_of(pid) or ["?"])[0], 0.0)
+
+def age_of(pid):
+    a = (players.get(pid) or {}).get("age")
+    return a if isinstance(a, (int, float)) else None
+
+for rid, t in teams.items():
+    ranked = sorted(((vor(p), p) for p in t["active"]
+                     if (positions_of(p) or ["?"])[0] not in ("K", "DEF")), reverse=True)
+    t["assets"] = [[name_of(p), (positions_of(p) or ["?"])[0], age_of(p), round(base_pts.get(p, 0.0), 1), round(v, 1)]
+                   for v, p in ranked[:5] if v > 0]
+    top = [(v, p) for v, p in ranked[:10] if v > 0]
+    wsum = sum(v for v, p in top if age_of(p))
+    t["core_age"] = round(sum(v * age_of(p) for v, p in top if age_of(p)) / wsum, 1) if wsum else None
+    t["proj_w"] = round(t["xw"])
+    t["proj_l"] = GAMES - t["proj_w"]
+    young = (t["core_age"] or 99) <= 25.8
+    po = t["po"] * 100
+    if po >= 65:
+        t["status"] = "Contending"
+    elif po >= 35:
+        t["status"] = "In the hunt"
+    elif young:
+        t["status"] = "Building"
+    else:
+        t["status"] = "Purgatory"
+
+def blurb(rid):
+    t = teams[rid]
+    po, ch = t["po"] * 100, t["champ"] * 100
+    pr, rr = pf_rank[rid], ros_rank[rid]
+    best = max(SHAPE_KEYS, key=lambda k: pos[rid][k] - pos_avg[k])
+    worst = min(SHAPE_KEYS, key=lambda k: pos[rid][k] - pos_avg[k])
+    gap_b, gap_w = pos[rid][best] - pos_avg[best], pos[rid][worst] - pos_avg[worst]
+    names = ", ".join(a[0] for a in t["assets"][:3])
+    s = []
+    rec = f"{t['w']}–{t['l']}"
+    if t["luck"] >= 0.8:
+        s.append(f"{rec} flatters them: they score {ordinal(pr)} in the league but have taken the soft side of the schedule, "
+                 f"and the all-play record ({t['apw']}–{t['apl']}) is the fairer picture.")
+    elif t["luck"] <= -0.8:
+        s.append(f"{rec} undersells them. They score {ordinal(pr)} in the league and have run into buzzsaws, "
+                 f"going {t['apw']}–{t['apl']} against the field as a whole.")
+    else:
+        s.append(f"{rec} is about right. They score {ordinal(pr)} in the league and sit {ordinal(ap_rank[rid])} "
+                 f"in all-play terms at {t['apw']}–{t['apl']}.")
+    s.append(f"The roster leans on {names}." if names else "There is no real centerpiece on the roster.")
+    shape = []
+    if gap_b >= 2:
+        shape.append(f"{best} is the edge, worth about {gap_b:.0f} points a week over the field")
+    if gap_w <= -2:
+        shape.append(f"{worst} is the hole, costing roughly {abs(gap_w):.0f} a week")
+    if shape:
+        s.append(shape[0][0].upper() + shape[0][1:] + (f", while {shape[1]}" if len(shape) > 1 else "") + ".")
+    if t["core_age"]:
+        if t["core_age"] <= 25.8:
+            age_read = "young enough that the window is still opening"
+        elif t["core_age"] >= 27.5:
+            age_read = "old enough that waiting another year costs them" if po < 50 else "old enough that the window is now"
+        else:
+            age_read = "right in its prime years"
+        s.append(f"Weighted by production the core is {t['core_age']} years old, {age_read}.")
+    s.append(f"Projection puts them at {t['proj_w']}–{t['proj_l']}, with {po:.0f}% playoff odds and "
+             f"{'a real title shot at ' + format(ch, '.0f') + '%' if ch >= 15 else 'a title shot under ' + ('1%' if ch < 1 else format(ch, '.0f') + '%')}. "
+             f"Rest of season they project {ordinal(rr)} in weekly scoring.")
+    verdict = {
+        "Contending": "This is a contender. Spend picks on the one weak slot and ride it.",
+        "In the hunt": "This is a bubble team: one trade or one bad month decides which way the season breaks.",
+        "Building": "The young core says build. Sell anyone over 28 while the price is good and stack picks.",
+        "Purgatory": "This is purgatory — not good enough to chase it, not young enough to wait it out. Pick a direction and commit.",
+    }[t["status"]]
+    s.append(verdict)
+    return " ".join(s)
+
+for rid in teams:
+    teams[rid]["blurb"] = blurb(rid)
+
 T = []
 for i, rid in enumerate(order):
     t = teams[rid]
@@ -287,6 +388,8 @@ for i, rid in enumerate(order):
         eff=round(t["eff"], 1) if t["eff"] is not None else None, act=round(t["act"], 1), opt=round(t["opt"], 1),
         left=round(t["left"], 1), bench=t["bench"],
         pos={k: round(pos[rid][k] - pos_avg[k], 1) for k in pos_keys},
+        status=t["status"], proj_w=t["proj_w"], proj_l=t["proj_l"], core_age=t["core_age"],
+        assets=t["assets"], blurb=t["blurb"], pfr=pf_rank[rid], rosr=ros_rank[rid],
         core=[[name_of(p), s, round(pts, 1)] for s, p, pts in proj[rid][show_week][1]] if show_week else []))
 
 data = dict(
