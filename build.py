@@ -49,6 +49,9 @@ if str(state.get("season")) != str(season):
     cur_week = 1 if state.get("season_type") in ("pre", "off") else cur_week
 
 matchups = {w: get(f"{API}/league/{LEAGUE_ID}/matchups/{w}") or [] for w in range(1, REG_SEASON_END + 1)}
+traded_picks = get(f"{API}/league/{LEAGUE_ID}/traded_picks") or []
+DRAFT_ROUNDS = int(league["settings"].get("draft_rounds", 4))
+PICK_SEASONS = [str(int(season) + 1), str(int(season) + 2)]
 
 def proj_week(w):
     pos = "&".join(f"position%5B%5D={p}" for p in POSITIONS)
@@ -278,6 +281,7 @@ show_week = next((w for w in future_weeks if w in proj[order[0]]), None)
 GAMES = len(ros_weeks) + len(done)
 pf_rank = {r: i + 1 for i, r in enumerate(sorted(teams, key=lambda r: -teams[r]["pf"]))}
 ros_rank = {r: i + 1 for i, r in enumerate(sorted(teams, key=lambda r: -teams[r]["ros"]))}
+eff_rank = {r: i + 1 for i, r in enumerate(sorted(teams, key=lambda r: -(teams[r]["eff"] or 0)))}
 ap_rank = {r: i + 1 for i, r in enumerate(sorted(teams, key=lambda r: -(teams[r]["apw"] / max(teams[r]["apw"] + teams[r]["apl"], 1))))}
 SHAPE_KEYS = ["QB", "RB", "WR", "TE", "DEF"]
 
@@ -320,127 +324,42 @@ for rid, t in teams.items():
         t["status"] = "Contending"
     elif po >= 35:
         t["status"] = "In the hunt"
+    elif po <= 12:
+        t["status"] = "Should be tanking"
     elif young:
         t["status"] = "Building"
     else:
         t["status"] = "Purgatory"
 
-import hashlib
+ROUND_NAME = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 5: "5th"}
 
-def pick(opts, rid, salt):
-    """Deterministic choice that rotates week to week, so the jokes don't go stale."""
-    k = hashlib.md5(f"{teams[rid]['name']}|{cur_week}|{salt}".encode()).hexdigest()
-    return opts[int(k, 16) % len(opts)]
+# Rookie-pick ownership. Everyone starts with their own picks; traded_picks only
+# lists the ones that changed hands.
+owned = {rid: [] for rid in teams}
+moved = {(tp["season"], tp["round"], tp["roster_id"]): tp["owner_id"] for tp in traded_picks}
+for season_y in PICK_SEASONS:
+    for rnd in range(1, DRAFT_ROUNDS + 1):
+        for orig in teams:
+            holder = moved.get((season_y, rnd, orig), orig)
+            if holder in owned:
+                owned[holder].append((season_y, rnd, orig))
 
-def jab(rid):
-    """One unkind sentence, chosen from whatever this team is worst at."""
-    t = teams[rid]
-    eff = t["eff"] or 100
-    left = t["left"]
-    bench = t["bench"]
-    po = t["po"] * 100
-    opts = []
-    if t["luck"] >= 0.8:
-        opts += [f"The schedule has been doing volunteer work on their behalf.",
-                 f"Somewhere there is a loss they earned and never received.",
-                 f"They are winning games the box score says they lost."]
-    if t["luck"] <= -0.8:
-        opts += ["Every week they load up and run into the one team that went off.",
-                 "The league's designated speed bump: good scores, catastrophic timing.",
-                 "They have been mugged by the schedule and nobody filed a report."]
-    if eff < 88:
-        opts += [f"They have left {left:.0f} points on the bench this year, which is a strategy if you squint.",
-                 f"{left:.0f} points on the bench. The roster is fine; the manager is the problem.",
-                 "Setting the lineup appears to be an optional part of the format for them."]
-    if bench and bench[1] >= 25:
-        opts += [f"{bench[0]} put up {bench[1]:.0f} in week {bench[2]} from the comfort of their bench."]
-    if (t["core_age"] or 0) >= 27.5 and po < 40:
-        opts += ["The core is older than the rebuild they keep refusing to start.",
-                 "This roster is aging in real time and still not winning anything."]
-    if (t["core_age"] or 99) <= 25 and po >= 60:
-        opts += ["Young and good, which is the most annoying combination to play against."]
-    if po >= 90:
-        opts += ["At this point the only real threat to them is their own lineup card.",
-                 "They are so far ahead that the rest of the league is playing for second."]
-    if po <= 10:
-        opts += ["Mathematically alive in the way a houseplant is alive.",
-                 "The playoff odds round to a rumor.",
-                 "They are playing out the string and the string is short."]
-    if len(t["out"]) >= 3:
-        opts += ["The injury report is longer than the starting lineup."]
-    return pick(opts, rid, "jab") if opts else None
+# Projected draft order for next spring: worst finish picks first.
+draft_slot = {r: i + 1 for i, r in enumerate(sorted(teams, key=lambda r: -teams[r]["exp_seed"]))}
 
-VERDICTS = {
-    "Contending": ["This is a contender. Patch the one weak slot and ride it.",
-                   "Legitimate contender. If this doesn't end in a title, the excuses are going to be elaborate.",
-                   "Push now. The roster is good enough that finishing second would be a choice."],
-    "In the hunt": ["A bubble team: one trade or one bad month decides which way the season breaks.",
-                    "Firmly in the middle, which is the worst place to be and the easiest place to stay.",
-                    "One decisive move from relevance, one quiet month from the lottery."],
-    "Building": ["The young core says build. Sell anyone over 28 while the price is good and stack picks.",
-                 "Keep building. Patience is cheaper than the trade it would take to win now.",
-                 "The future is genuinely bright, which is what everyone says before trading it away for a 7-7 season."],
-    "Purgatory": ["Purgatory: not good enough to chase it, not young enough to wait it out. Pick a direction and commit.",
-                  "Stuck in the middle. The middle of the road is where the roadkill is.",
-                  "Neither contending nor rebuilding, which is a decision disguised as patience."],
-}
+def pick_label(season_y, rnd, orig, self_rid):
+    tag = f"{season_y} {ROUND_NAME.get(rnd, str(rnd))}"
+    if orig != self_rid:
+        tag += f" (via {teams[orig]['name']})"
+    if season_y == PICK_SEASONS[0] and rnd <= 2:
+        tag += f" · proj. #{draft_slot[orig]}"
+    return tag
 
-import hashlib
-
-def pick(opts, rid, salt):
-    """Deterministic choice that rotates week to week, so the jokes don't go stale."""
-    k = hashlib.md5(f"{teams[rid]['name']}|{cur_week}|{salt}".encode()).hexdigest()
-    return opts[int(k, 16) % len(opts)]
-
-def jab(rid):
-    """One unkind sentence, drawn from whatever this team is worst at."""
-    t = teams[rid]
-    eff, left, bench, po = (t["eff"] or 100), t["left"], t["bench"], t["po"] * 100
-    opts = []
-    if t["luck"] >= 0.8:
-        opts += ["The schedule has been doing volunteer work on their behalf.",
-                 "Somewhere there is a loss they earned and never received.",
-                 "They keep winning games the box score says they lost."]
-    if t["luck"] <= -0.8:
-        opts += ["Every week they load up and run into the one team that went off.",
-                 "The league's designated speed bump: good scores, catastrophic timing.",
-                 "They have been mugged by the schedule and nobody filed a report."]
-    if eff < 88:
-        opts += [f"They have left {left:.0f} points on the bench this year, which is a strategy if you squint.",
-                 f"{left:.0f} points on the bench so far. The roster is fine; the manager is the variable.",
-                 "Setting the lineup appears to be optional in their format."]
-    if bench and bench[1] >= 25:
-        opts += [f"{bench[0]} put up {bench[1]:.0f} in week {bench[2]} from the comfort of their bench."]
-    if (t["core_age"] or 0) >= 27.5 and po < 40:
-        opts += ["The core is older than the rebuild they keep refusing to start.",
-                 "This roster is aging in real time and still not winning anything."]
-    if (t["core_age"] or 99) <= 25 and po >= 60:
-        opts += ["Young and good, which is the most annoying combination to play against."]
-    if po >= 90:
-        opts += ["At this point the only real threat to them is their own lineup card.",
-                 "They are far enough ahead that everyone else is playing for second."]
-    if po <= 10:
-        opts += ["Mathematically alive the way a houseplant is alive.",
-                 "The playoff odds round down to a rumor.",
-                 "They are playing out the string, and the string is short."]
-    if len(t["out"]) >= 3:
-        opts += ["The injury report is longer than the starting lineup."]
-    return pick(opts, rid, "jab") if opts else None
-
-VERDICTS = {
-    "Contending": ["A real contender. Patch the one weak slot and ride it.",
-                   "Legitimate contender. If this doesn't end in a title, the excuses will have to be elaborate.",
-                   "Push now. This roster is good enough that finishing second would be a choice."],
-    "In the hunt": ["A bubble team: one trade or one bad month decides which way the season breaks.",
-                    "Firmly in the middle, which is the worst place to be and the easiest place to stay.",
-                    "One decisive move from relevance, one quiet month from the lottery."],
-    "Building": ["The young core says build. Sell anyone over 28 while the price is good and stack picks.",
-                 "Keep building. Patience is cheaper than the trade it would take to win now.",
-                 "The future is genuinely bright, which is what everyone says right before trading it for a 7–7 season."],
-    "Purgatory": ["Purgatory: not good enough to chase it, not young enough to wait it out. Pick a direction and commit.",
-                  "Stuck in the middle, and the middle of the road is where the roadkill is.",
-                  "Neither contending nor rebuilding, which is a decision wearing a patience costume."],
-}
+for rid, t in teams.items():
+    picks = sorted(owned[rid], key=lambda x: (x[0], x[1], draft_slot[x[2]]))
+    t["picks"] = [pick_label(sy, rn, og, rid) for sy, rn, og in picks if rn <= 2][:6]
+    t["pick_count"] = len(picks)
+    t["firsts"] = sum(1 for sy, rn, og in picks if rn == 1)
 
 def blurb(rid):
     t = teams[rid]
@@ -450,40 +369,77 @@ def blurb(rid):
     worst = min(SHAPE_KEYS, key=lambda k: pos[rid][k] - pos_avg[k])
     gap_b, gap_w = pos[rid][best] - pos_avg[best], pos[rid][worst] - pos_avg[worst]
     names = ", ".join(a[0] for a in t["assets"][:3])
+    age = t["core_age"]
     s = []
     rec = f"{t['w']}–{t['l']}"
+
+    # 1. what the record is actually worth
     if t["luck"] >= 0.8:
-        s.append(f"{rec} flatters them: they score {ordinal(pr)} in the league but have taken the soft side of the schedule, "
-                 f"and the all-play record ({t['apw']}–{t['apl']}) is the fairer picture.")
+        s.append(f"{rec} overstates them. They score {ordinal(pr)} in the league and are {t['apw']}–{t['apl']} "
+                 f"in all-play, {ordinal(ap_rank[rid])} against the field as a whole — the wins have come from the draw, not the roster.")
     elif t["luck"] <= -0.8:
-        s.append(f"{rec} undersells them. They score {ordinal(pr)} in the league and have run into buzzsaws, "
-                 f"going {t['apw']}–{t['apl']} against the field as a whole.")
+        s.append(f"{rec} understates them. They score {ordinal(pr)} in the league and are {t['apw']}–{t['apl']} "
+                 f"in all-play, {ordinal(ap_rank[rid])} against the field as a whole — this is a better team than the standings say.")
     else:
-        s.append(f"{rec} is about right. They score {ordinal(pr)} in the league and sit {ordinal(ap_rank[rid])} "
-                 f"in all-play terms at {t['apw']}–{t['apl']}.")
-    s.append(f"The roster leans on {names}." if names else "There is no real centerpiece on the roster.")
+        s.append(f"{rec} is honest. They score {ordinal(pr)} in the league and are {t['apw']}–{t['apl']} in all-play, "
+                 f"{ordinal(ap_rank[rid])} against the field as a whole.")
+
+    # 2. roster shape
+    s.append(f"The roster runs through {names}." if names else "Nothing on this roster qualifies as a centerpiece.")
     shape = []
     if gap_b >= 2:
-        shape.append(f"{best} is the edge, worth about {gap_b:.0f} points a week over the field")
+        shape.append(f"{best} is the one real edge, about {gap_b:.0f} points a week on the field")
     if gap_w <= -2:
-        shape.append(f"{worst} is the hole, costing roughly {abs(gap_w):.0f} a week")
+        shape.append(f"{worst} costs them roughly {abs(gap_w):.0f} a week")
     if shape:
         s.append(shape[0][0].upper() + shape[0][1:] + (f", while {shape[1]}" if len(shape) > 1 else "") + ".")
-    if t["core_age"]:
-        if t["core_age"] <= 25.8:
-            age_read = "young enough that the window is still opening"
-        elif t["core_age"] >= 27.5:
-            age_read = "old enough that waiting another year costs them" if po < 50 else "old enough that the window is now"
+
+    # 3. things that are quietly deciding the season
+    notes = []
+    if (t["eff"] or 100) < 88:
+        notes.append(f"{t['left']:.0f} points have died on their bench, {ordinal(eff_rank[rid])} in lineup efficiency")
+    if len(t["out"]) >= 3:
+        notes.append(f"{len(t['out'])} starters are hurt or limited right now")
+    if notes:
+        s.append(notes[0][0].upper() + notes[0][1:] + (f"; {notes[1]}" if len(notes) > 1 else "") + ".")
+
+    # 4. age and the window
+    if age:
+        if age <= 25.8:
+            s.append(f"The core is {age} years old weighted by production, young enough that the best version of this team is still ahead of it.")
+        elif age >= 27.5:
+            s.append(f"The core is {age} years old weighted by production — "
+                     + ("this is as good as it gets, so it has to be now." if po >= 50 else
+                        "aging out of relevance without having been relevant."))
         else:
-            age_read = "right in its prime years"
-        s.append(f"Weighted by production the core is {t['core_age']} years old, {age_read}.")
-    s.append(f"Projection puts them at {t['proj_w']}–{t['proj_l']}, with {po:.0f}% playoff odds and "
-             f"{'a real title shot at ' + format(ch, '.0f') + '%' if ch >= 15 else 'a title shot under ' + ('1%' if ch < 1 else format(ch, '.0f') + '%')}. "
-             f"Rest of season they project {ordinal(rr)} in weekly scoring.")
-    j = jab(rid)
-    if j:
-        s.append(j)
-    s.append(pick(VERDICTS[t["status"]], rid, "verdict"))
+            s.append(f"The core is {age} years old weighted by production, squarely in its prime.")
+
+    # 5. where it ends up
+    title = (f"a genuine title shot at {ch:.0f}%" if ch >= 15 else
+             f"a {ch:.0f}% title shot" if ch >= 1 else "effectively no title equity")
+    s.append(f"The model lands them at {t['proj_w']}–{t['proj_l']} with {po:.0f}% playoff odds and {title}, "
+             f"{ordinal(rr)} in rest-of-season scoring.")
+
+    # 6. the verdict, blunt
+    cap = t["firsts"]
+    if t["status"] == "Contending":
+        s.append(f"This is a contender. {'Spend a first on ' + worst if cap else 'Fix ' + worst} and stop hedging — "
+                 f"windows like this close without warning.")
+    elif t["status"] == "In the hunt":
+        s.append("This is the bubble. Half a move in either direction decides the season, and standing still "
+                 "means finishing seventh with nothing to show for it.")
+    elif t["status"] == "Building":
+        s.append(f"The build is real. {cap} first-rounders in hand and a young core — sell every veteran over 28 "
+                 f"while somebody still wants them." if cap else
+                 "The build is real. Sell every veteran over 28 while somebody still wants them.")
+    elif t["status"] == "Should be tanking":
+        s.append(f"There is no season here to save. "
+                 f"{'The ' + str(cap) + ' first-rounders are the asset that matters now' if cap else 'The only currency left is next year'} — "
+                 f"move every veteran with a pulse, lose on purpose, and come back with the top of the draft.")
+    else:
+        s.append(f"This is the bleak one: too old to wait, too thin to chase. "
+                 f"{'The ' + str(cap) + ' first-rounders are the only real assets left' if cap else 'There is almost nothing left to trade'} — "
+                 f"tear it down now, because next year this roster is worth less than it is today.")
     return " ".join(s)
 
 for rid in teams:
@@ -504,6 +460,7 @@ for i, rid in enumerate(order):
         pos={k: round(pos[rid][k] - pos_avg[k], 1) for k in pos_keys},
         status=t["status"], proj_w=t["proj_w"], proj_l=t["proj_l"], core_age=t["core_age"],
         assets=t["assets"], blurb=t["blurb"], pfr=pf_rank[rid], rosr=ros_rank[rid],
+        picks=t["picks"], firsts=t["firsts"], pick_count=t["pick_count"],
         core=[[name_of(p), s, round(pts, 1)] for s, p, pts in proj[rid][show_week][1]] if show_week else []))
 
 data = dict(
